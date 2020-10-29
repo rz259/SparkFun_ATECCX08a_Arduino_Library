@@ -44,7 +44,8 @@
 #define RESPONSE_RANDOM_SIZE 32
 #define CRC_SIZE             2
 #define CONFIG_ZONE_SIZE     128
-#define SERIAL_NUMBER_SIZE   10
+#define SERIAL_NUMBER_SIZE   9
+#define REVISION_NUMBER_SIZE   4
 
 #define RANDOM_BYTES_BLOCK_SIZE 32
 #define SHA256_SIZE          32
@@ -141,10 +142,13 @@
 #define GENKEY_MODE_PUBLIC 			0b00000000
 #define GENKEY_MODE_NEW_PRIVATE 	0b00000100
 
-#define NONCE_MODE_PASSTHROUGH		0b00000011 // Operate in pass-through mode and Write TempKey with NumIn. datasheet pg 79
-#define SIGN_MODE_TEMPKEY			0b10000000 // The message to be signed is in TempKey. datasheet pg 85
-#define VERIFY_MODE_EXTERNAL		0b00000010 // Use an external public key for verification, pass to command as data post param2, ds pg 89
-#define VERIFY_MODE_STORED			0b00000000 // Use an internally stored public key for verification, param2 = keyID, ds pg 89
+#define NONCE_MODE_PASSTHROUGH		 0b00000011 // Operate in pass-through mode and Write TempKey with NumIn. datasheet pg 79
+#define SIGN_MODE_TEMPKEY			     0b10000000 // The message to be signed is in TempKey. datasheet pg 85
+#define VERIFY_MODE_EXTERNAL		   0b00000010 // Use an external public key for verification, pass to command as data post param2, ds pg 89
+#define VERIFY_MODE_STORED			   0b00000000 // Use an internally stored public key for verification, param2 = keyID, ds pg 89
+#define VERIFY_MODE_SOURCE_TEMPKEY 0b00000000
+#define VERIFY_MODE_SOURCE_MSGDIGBUF 0x20
+
 #define VERIFY_PARAM2_KEYTYPE_ECC 	0x0004 // When verify mode external, param2 should be KeyType, ds pg 89
 #define VERIFY_PARAM2_KEYTYPE_NONECC 	0x0007 // When verify mode external, param2 should be KeyType, ds pg 89
 
@@ -171,78 +175,88 @@ class ATECCX08A {
   public:
   
     //By default use Wire, standard I2C speed, and the default ADS1015 address
-	#if defined(ARDUINO_ARCH_APOLLO3) // checking which board we are using and selecting a Serial debug that will work.
-	boolean begin(uint8_t i2caddr = ATECC508A_ADDRESS_DEFAULT, TwoWire &wirePort = Wire, Stream &serialPort = Serial); // Artemis
-	#else
-	boolean begin(uint8_t i2caddr = ATECC508A_ADDRESS_DEFAULT, TwoWire &wirePort = Wire, Stream &serialPort = Serial);  // SamD21 boards
-	#endif
-	
-	byte inputBuffer[BUFFER_SIZE]; // used to store messages received from the IC as they come in
-	byte configZone[128]; // used to store configuration zone bytes read from device EEPROM
-	uint8_t revisionNumber[5]; // used to store the complete revision number, pulled from configZone[4-7]
-	uint8_t serialNumber[10]; // used to store the complete Serial number, pulled from configZone[0-3] and configZone[8-12]
-	boolean configLockStatus; // pulled from configZone[87], then set according to status (0x55=UNlocked, 0x00=Locked)
-	boolean dataOTPLockStatus; // pulled from configZone[86], then set according to status (0x55=UNlocked, 0x00=Locked)
-	boolean slot0LockStatus; // pulled from configZone[88], then set according to slot (bit 0) status
+		boolean begin(uint8_t i2caddr = ATECC508A_ADDRESS_DEFAULT, TwoWire &wirePort = Wire, Stream &serialPort = Serial); 
+		
+		boolean receiveResponseData(uint8_t length = 0, boolean debug = false);
+		boolean checkCount(boolean debug = false);
+		boolean checkCrc(boolean debug = false);
+		void cleanInputBuffer();
+		
+		boolean wakeUp();
+		void idleMode();
+		boolean getInfo();
+		boolean writeConfigSparkFun();
+		boolean lockConfiguration(); // note, this PERMINANTLY disables changes to config zone - including changing the I2C address!
+		boolean lockDataAndOTP();
+		boolean lockDataSlot0();
+		boolean lockDataSlot(uint16_t slot);
+		
+		
+		boolean lock(uint8_t zone);
+		
+		
+		// Random array and fuctions
+		boolean generateRandomBytes(uint8_t *randomValue, int length, boolean debug = false);
+		byte getRandomByte(boolean debug = false);
+		int getRandomInt(boolean debug = false);
+		long getRandomLong(boolean debug = false);
+		long random(long max);
+		long random(long min, long max);
+		
+	// SHA256
+		boolean sha256(uint8_t * data, size_t len, uint8_t * hash);
+		
+		uint8_t crc[2] = {0, 0};
+		void atca_calculate_crc(uint8_t length, uint8_t *data);	
+		
+		// Key functions
+		boolean createNewKeyPair(uint16_t slot = 0x0000);
+		boolean generatePublicKey(uint16_t slot = 0x0000, boolean debug = true);
+		byte *getPublicKey();
+		
+		
+		boolean createSignature(uint8_t *data, uint16_t slot = 0x0000); 
+		boolean loadTempKey(uint8_t *data);  // load 32 bytes of data into tempKey (a temporary memory spot in the IC)
+		boolean signTempKey(uint16_t slot = 0x0000); // create signature using contents of TempKey and PRIVATE KEY in slot
+		boolean verifySignature(uint8_t *message, uint8_t *signature, uint8_t *publicKey); // external ECC publicKey only
 
-	byte publicKey64Bytes[64]; // used to store the public key returned when you (1) create a keypair, or (2) read a public key
-	uint8_t signature[64];
-	
-	boolean receiveResponseData(uint8_t length = 0, boolean debug = false);
-	boolean checkCount(boolean debug = false);
-	boolean checkCrc(boolean debug = false);
-	uint8_t countGlobal = 0; // used to add up all the bytes on a long message. Important to reset before each new receiveMessageData();
-	void cleanInputBuffer();
-	
-	boolean wakeUp();
-	void idleMode();
-	boolean getInfo();
-	boolean writeConfigSparkFun();
-	boolean lockConfig(); // note, this PERMINANTLY disables changes to config zone - including changing the I2C address!
-	boolean lockDataAndOTP();
-	boolean lockDataSlot0();
-	boolean lock(uint8_t zone);
-	boolean getSlotLockStatus(uint16_t slot);
-	
-	
-	// Random array and fuctions
-	boolean generateRandomBytes(uint8_t *randomValue, int length, boolean debug = false);
-	byte getRandomByte(boolean debug = false);
-	int getRandomInt(boolean debug = false);
-	long getRandomLong(boolean debug = false);
-	long random(long max);
-	long random(long min, long max);
-	
-// SHA256
-	boolean sha256(uint8_t * data, size_t len, uint8_t * hash);
-	
-	uint8_t crc[2] = {0, 0};
-	void atca_calculate_crc(uint8_t length, uint8_t *data);	
-	
-	// Key functions
-	boolean createNewKeyPair(uint16_t slot = 0x0000);
-	boolean generatePublicKey(uint16_t slot = 0x0000, boolean debug = true);
-	byte *getPublicKey();
-	
-	
-	boolean createSignature(uint8_t *data, uint16_t slot = 0x0000); 
-	boolean loadTempKey(uint8_t *data);  // load 32 bytes of data into tempKey (a temporary memory spot in the IC)
-	boolean signTempKey(uint16_t slot = 0x0000); // create signature using contents of TempKey and PRIVATE KEY in slot
-	boolean verifySignature(uint8_t *message, uint8_t *signature, uint8_t *publicKey); // external ECC publicKey only
+		boolean read(uint8_t zone, uint16_t address, uint8_t length, boolean debug = false);
+		boolean write(uint8_t zone, uint16_t address, uint8_t *data, uint8_t length_of_data);
+		boolean writeKey(uint16_t slot, uint8_t *data, uint8_t length);
 
-	boolean read(uint8_t zone, uint16_t address, uint8_t length, boolean debug = false);
-	boolean write(uint8_t zone, uint16_t address, uint8_t *data, uint8_t length_of_data);
+		boolean readConfigZone(boolean debug = true);
+		byte    *getConfigZone();
+		boolean sendCommand(uint8_t command_opcode, uint8_t param1, uint16_t param2, uint8_t *data = NULL, size_t length_of_data = 0);
 
-	boolean readConfigZone(boolean debug = true);
-	boolean sendCommand(uint8_t command_opcode, uint8_t param1, uint16_t param2, uint8_t *data = NULL, size_t length_of_data = 0);
+		// get lock states	
+		boolean getConfigLockStatus();
+		boolean getDataOTPLockStatus();
+		boolean getSlotLockStatus(uint16_t slot);
+		
+	  boolean getSerialNumber(uint8_t *serialNo, int length);
+	  boolean getRevisionNumber(uint8_t *revisionNo, int length);
+    boolean getSignature(uint8_t *signature, int length);
+		
 	
   private:
 
-	TwoWire *_i2cPort;
-
-	uint8_t _i2caddr;
+		TwoWire *_i2cPort;
+		uint8_t _i2caddr;
+		Stream *_debugSerial; //The generic connection to user's chosen serial hardware
+		
+  	byte configZone[128]; // used to store configuration zone bytes read from device EEPROM
+  	byte inputBuffer[BUFFER_SIZE]; // used to store messages received from the IC as they come in
+  	boolean configLockStatus; // pulled from configZone[87], then set according to status (0x55=UNlocked, 0x00=Locked)
+	  boolean dataOTPLockStatus; // pulled from configZone[86], then set according to status (0x55=UNlocked, 0x00=Locked)
+	  boolean slot0LockStatus; // pulled from configZone[88], then set according to slot (bit 0) status
+		uint8_t countGlobal = 0; // used to add up all the bytes on a long message. Important to reset before each new receiveMessageData();
+  	uint8_t revisionNumber[REVISION_NUMBER_SIZE]; // used to store the complete revision number, pulled from configZone[4-7]
+	  uint8_t serialNumber[SERIAL_NUMBER_SIZE]; // used to store the complete Serial number, pulled from configZone[0-3] and configZone[8-12]
+  	byte publicKey64Bytes[64]; // used to store the public key returned when you (1) create a keypair, or (2) read a public key
+	  uint8_t signature[SIGNATURE_SIZE];
 	
-	Stream *_debugSerial; //The generic connection to user's chosen serial hardware
+
+	
 	
 };
 

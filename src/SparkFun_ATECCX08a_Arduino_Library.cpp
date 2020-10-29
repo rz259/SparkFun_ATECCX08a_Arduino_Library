@@ -130,13 +130,13 @@ boolean ATECCX08A::getInfo()
 
 /** \brief
 
-	lockConfig()
+	lockConfiguration()
 	
 	This function sends the LOCK Command with the configuration zone parameter, 
 	and listens for success response (0x00).
 */
 
-boolean ATECCX08A::lockConfig()
+boolean ATECCX08A::lockConfiguration()
 {
   return lock(LOCK_MODE_ZONE_CONFIG);
 }
@@ -232,6 +232,18 @@ boolean ATECCX08A::lockDataSlot0()
   return lock(LOCK_MODE_SLOT0);
 }
 
+boolean ATECCX08A::lockDataSlot(uint16_t slot)
+{
+	uint8_t lockMode;
+	
+	
+	slot = slot << 2; // the slot to be locked is encoded in bits 2 to 5 
+	                  // (see data sheet p. 75), so we need to shift the slot 2 bits left
+	lockMode = LOCK_MODE_SLOT | slot; // set bits in lockmode parameter
+  return lock(lockMode);
+}
+
+
 /** \brief
 
 	lock(byte zone)
@@ -248,7 +260,7 @@ boolean ATECCX08A::lock(uint8_t zone)
   
   // Now let's read back from the IC and see if it reports back good things.
   countGlobal = 0; 
-  if(receiveResponseData(4) == false) return false;
+  if(receiveResponseData(4, true) == false) return false;
   idleMode();
   if(checkCount() == false) return false;
   if(checkCrc() == false) return false;
@@ -426,7 +438,7 @@ boolean ATECCX08A::receiveResponseData(uint8_t length, boolean debug)
   // if length is less than or equal to 32, then just pull it in.
   // if length is greater than 32, then we must first pull in 32, then pull in remainder.
   // lets use length as our tracker and we will subtract from it as we pull in data.
-  const int maxRequests = 50;
+  const int maxRequests = 1000;
 	
   countGlobal = 0; // reset for each new message (most important, like wensleydale at a cheese party)
   cleanInputBuffer();
@@ -739,15 +751,15 @@ boolean ATECCX08A::write(uint8_t zone, uint16_t address, uint8_t *data, uint8_t 
   // (1 = 32 Bytes are written)
   if(length_of_data == 32) 
   {
-	zone |= 0b10000000; // set bit 7
+	  zone |= 0b10000000; // set bit 7
   }
   else if(length_of_data == 4)
   {
-	zone &= ~0b10000000; // clear bit 7
+	  zone &= ~0b10000000; // clear bit 7
   }
   else
   {
-	return 0; // invalid length, abort.
+	  return 0; // invalid length, abort.
   }
  
   sendCommand(COMMAND_OPCODE_WRITE, zone, address, data, length_of_data);
@@ -756,13 +768,28 @@ boolean ATECCX08A::write(uint8_t zone, uint16_t address, uint8_t *data, uint8_t 
   
   // Now let's read back from the IC and see if it reports back good things.
   countGlobal = 0; 
-  if(receiveResponseData(4) == false) return false;
+  if (receiveResponseData(4) == false) 
+		return false;
   idleMode();
-  if(checkCount() == false) return false;
-  if(checkCrc() == false) return false;
-  if(inputBuffer[1] == 0x00) return true;   // If we hear a "0x00", that means it had a successful write
-  else return false;
+  if (checkCount() == false) 
+		return false;
+  if (checkCrc() == false) 
+		return false;
+  if (inputBuffer[1] == 0x00) 
+		return true;   // If we hear a "0x00", that means it had a successful write
+  else 
+		return false;
 }
+
+boolean ATECCX08A::writeKey(uint16_t slot, uint8_t *data, uint8_t length)
+{
+	if (slot < 0 || slot > 15)
+		return false;
+	if (length != 32)
+		return false;
+	return write(ZONE_DATA, slot, data, length);
+}
+
 
 /** \brief
 
@@ -895,20 +922,20 @@ boolean ATECCX08A::verifySignature(uint8_t *message, uint8_t *signature, uint8_t
   memcpy(&data_sigAndPub[64], &publicKey[0], 64);	// append external public key
   
   sendCommand(COMMAND_OPCODE_VERIFY, VERIFY_MODE_EXTERNAL, VERIFY_PARAM2_KEYTYPE_ECC, data_sigAndPub, sizeof(data_sigAndPub));
+	
 
   delay(58); // time for IC to process command and exectute
-	delay(800); // additional wait time
 
   // Now let's read back from the IC.
   
-  if(receiveResponseData(4, true) == false) 
+  if (receiveResponseData(4, false) == false) 
 	{
     _debugSerial->println("receiveResponseData(4) Failure");
 		return false;
 	}
-  // idleMode();
-  boolean checkCountResult = checkCount(true);
-  boolean checkCrcResult = checkCrc(true);
+  idleMode();
+  boolean checkCountResult = checkCount(false);
+  boolean checkCrcResult = checkCrc(false);
   
   if( (checkCountResult == false) || (checkCrcResult == false) ) return false;
   
@@ -1117,8 +1144,55 @@ boolean ATECCX08A::getSlotLockStatus(uint16_t slot)
 }
 
 
+boolean ATECCX08A::getConfigLockStatus()
+{
+  return configLockStatus;	
+}
+
+boolean ATECCX08A::getDataOTPLockStatus()
+{
+  return dataOTPLockStatus;	
+}
+
+byte   * ATECCX08A::getConfigZone()
+{
+	return configZone;
+}
 
 
+boolean ATECCX08A::getSerialNumber(uint8_t *serialNo, int length)
+{
+	if (length < sizeof(serialNumber))
+		return false;
+	else
+	{
+		memcpy(serialNo, serialNumber, SERIAL_NUMBER_SIZE);
+		return true;
+	}
+}
+
+boolean ATECCX08A::getRevisionNumber(uint8_t *revisionNo, int length)
+{
+	if (length < sizeof(revisionNumber))
+		return false;
+	else
+	{
+		memcpy(revisionNo, revisionNumber, REVISION_NUMBER_SIZE);
+		return true;
+	}
+}
+
+
+boolean ATECCX08A::getSignature(uint8_t *signature, int length)
+{
+	if (length < SIGNATURE_SIZE)
+		return false;
+	else
+	{
+		memcpy(signature, this->signature, SIGNATURE_SIZE);
+		return true;
+	}
+}
 
 
 
