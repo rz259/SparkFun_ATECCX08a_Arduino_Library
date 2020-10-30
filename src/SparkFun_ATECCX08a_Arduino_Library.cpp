@@ -1344,9 +1344,11 @@ boolean ATECCX08A::sha256(uint8_t * plain, size_t len, uint8_t * hash)
 }
 
 
-boolean ATECCX08A::encryptDecrypt(uint8_t *clearText, int sizeClearText, uint8_t *encrypted, int sizeEncrypted, uint8_t slot, uint8_t keyIndex, uint8_t mode, boolean debug)
+boolean ATECCX08A::encryptDecryptBlock(uint8_t *input, int inputSize, uint8_t *output, int outputSize, uint8_t slot, uint8_t keyIndex, uint8_t mode, boolean debug)
 {
-	if (clearText == NULL || sizeClearText != AES_BLOCKSIZE || encrypted == NULL || sizeEncrypted != AES_BLOCKSIZE)
+	int size;
+
+	if (input == NULL || inputSize != AES_BLOCKSIZE || output == NULL || outputSize != AES_BLOCKSIZE)
 	{
 		setStatus(STATUS_INVALID_PARAMETER);
 		return false;
@@ -1375,7 +1377,6 @@ boolean ATECCX08A::encryptDecrypt(uint8_t *clearText, int sizeClearText, uint8_t
 		_debugSerial->println("size cleartext : " + String(sizeClearText));
 		_debugSerial->println("Slot           : " + String(slot));
 		_debugSerial->println("KeyIndex       : " + String(keyIndex));
-*/		
 		_debugSerial->println("Mode           : " + String(mode));
 		_debugSerial->print("Input data     : " );
 		for (int index = 0; index < AES_BLOCKSIZE; index++)
@@ -1383,51 +1384,34 @@ boolean ATECCX08A::encryptDecrypt(uint8_t *clearText, int sizeClearText, uint8_t
 			printHexValue(clearText[index]);
 		}
 		_debugSerial->println();
+*/		
 	}
 	
-  sendCommand(COMMAND_OPCODE_AES, mode, slot, clearText, sizeClearText, false);
+  sendCommand(COMMAND_OPCODE_AES, mode, slot, input, inputSize, false);
 
-  delay(115); // time for IC to process command and exectute
+  delay(10); // time for IC to process command and execute
 
-  // Now let's read back from the IC.
-  
-	int size;
-	
-	size = AES_BLOCKSIZE + 2 + 1;
-  if (receiveResponseData(size, debug) == false)
+  // Now let's read the response 
+	size = 1 + AES_BLOCKSIZE + 2;  // length byte, encrypted data (16 bytes), crc (2 bytes)
+  if (receiveResponseData(size, false) == false)
 	{ 
     _debugSerial->println("receiveResponseData return false");
 		setStatus(STATUS_EXECUTION_ERROR);
     return false; // encrypted data (16), plus crc (2), plus count (1)
 	}
   idleMode();
-  boolean checkCountResult = checkCount(true);
-  boolean checkCrcResult = checkCrc(true);
+  boolean checkCountResult = checkCount(false);
+  boolean checkCrcResult = checkCrc(false);
   
   if (checkCountResult && checkCrcResult) // check that it was a good message
   {  
-    // we don't need the count value (which is currently the first byte of the inputBuffer)
-    for (int i = 0 ; i < AES_BLOCKSIZE ; i++) // for loop through to grab all but the first position (which is "count" of the message)
-    {
-      encrypted[i] = inputBuffer[i+1];
-    }
+    // ignore first byte (length byte), so we start from offset 1
+		memcpy(output, &inputBuffer[1], AES_BLOCKSIZE);
 		if (debug)
 		{
 			_debugSerial->println("output data:");
 			_debugSerial->println();
-			for (int i = 0; i < size; i++)
-			{
-				_debugSerial->print("0x");
-				if ((encrypted[i] >> 4) == 0) 
-					_debugSerial->print("0"); // print preceeding high nibble if it's zero
-				_debugSerial->print(encrypted[i], HEX);
-				if (i != 63) 
-					_debugSerial->print(", ");
-				if ((63-i) % 16 == 0) 
-					_debugSerial->println();
-			}
-			_debugSerial->println("};");
-			_debugSerial->println();
+			printHexValue(output, AES_BLOCKSIZE, ", ");
 		}
   	setStatus(STATUS_SUCCESS);
   	return true;
@@ -1441,15 +1425,6 @@ boolean ATECCX08A::encryptDecrypt(uint8_t *clearText, int sizeClearText, uint8_t
 }
 
 
-boolean ATECCX08A::encrypt(uint8_t *clearText, int sizeClearText, uint8_t *encrypted, int sizeEncrypted, uint8_t slot, uint8_t keyIndex, boolean debug)
-{
-	encryptDecrypt(clearText, sizeClearText, encrypted, sizeEncrypted, slot, keyIndex, AES_ENCRYPT, debug);
-}
-
-boolean ATECCX08A::decrypt(uint8_t *clearText, int sizeClearText, uint8_t *encrypted, int sizeEncrypted, uint8_t slot, uint8_t keyIndex, boolean debug)
-{
-	encryptDecrypt(clearText, sizeClearText, encrypted, sizeEncrypted, slot, keyIndex, AES_DECRYPT, debug);
-}
 
 
 byte * ATECCX08A::getPublicKey()
@@ -1564,5 +1539,15 @@ void ATECCX08A::printHexValue(byte value)
 	if ((value >> 4) == 0) 
 		_debugSerial->print("0"); // print preceeding high nibble if it's zero
 	_debugSerial->print(value, HEX);
+}
+
+void ATECCX08A::printHexValue(byte value[], int length, char *separator)
+{
+	for (int index = 0; index < length; index++)
+	{
+		printHexValue(value[index]);
+	 _debugSerial->print(String(separator));
+	}
+	_debugSerial->println();
 }
 

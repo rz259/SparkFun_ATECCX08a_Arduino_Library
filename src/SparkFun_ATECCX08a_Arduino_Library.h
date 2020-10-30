@@ -267,10 +267,8 @@ class ATECCX08A {
 		
 		int getStatus();
 		boolean isAESEnabled();
-		boolean encrypt(uint8_t *clearText, int sizeClearText, uint8_t *encrypted, int sizeEncrypted, uint8_t slot, uint8_t keyIndex, boolean debug);
-		boolean decrypt(uint8_t *clearText, int sizeClearText, uint8_t *encrypted, int sizeEncrypted, uint8_t slot, uint8_t keyIndex, boolean debug);
-
-		
+    // boolean encryptDecrypt(uint8_t *clearText, int sizeClearText, uint8_t *encrypted, int sizeEncrypted, uint8_t slot, uint8_t keyIndex, uint8_t mode, boolean debug = false);
+		boolean encryptDecryptBlock(uint8_t *input, int inputSize, uint8_t *output, int outputSize, uint8_t slot, uint8_t keyIndex, uint8_t mode, boolean debug=false);
 	
 	protected:
 		boolean sendCommand(uint8_t command_opcode, uint8_t param1, uint16_t param2, const uint8_t *data = NULL, size_t length_of_data = 0, boolean debug=false);
@@ -295,8 +293,8 @@ class ATECCX08A {
   	byte publicKey64Bytes[64]; // used to store the public key returned when you (1) create a keypair, or (2) read a public key
 	  uint8_t signature[SIGNATURE_SIZE];
 
-		boolean encryptDecrypt(uint8_t *clearText, int sizeClearText, uint8_t *encrypted, int sizeEncrypted, uint8_t slot, uint8_t keyIndex, uint8_t mode, boolean debug=false);
 	  void printHexValue(byte value);
+		void printHexValue(byte value[], int length, char *separator);
 	
 };
 
