@@ -61,16 +61,18 @@
 #define WORD_ADDRESS_VALUE_IDLE 0x02 // used to enter idle mode
 
 // COMMANDS (aka "opcodes" in the datasheet)
-#define COMMAND_OPCODE_INFO 	0x30 // Return device state information.
-#define COMMAND_OPCODE_LOCK 	0x17 // Lock configuration and/or Data and OTP zones
+#define COMMAND_OPCODE_INFO 	  0x30 // Return device state information.
+#define COMMAND_OPCODE_LOCK 	  0x17 // Lock configuration and/or Data and OTP zones
 #define COMMAND_OPCODE_RANDOM 	0x1B // Create and return a random number (32 bytes of data)
-#define COMMAND_OPCODE_READ 	0x02 // Return data at a specific zone and address.
-#define COMMAND_OPCODE_WRITE 	0x12 // Return data at a specific zone and address.
-#define COMMAND_OPCODE_SHA 		0x47 // Computes a SHA-256 or HMAC/SHA digest for general purpose use by the system.
+#define COMMAND_OPCODE_READ 	  0x02 // Return data at a specific zone and address.
+#define COMMAND_OPCODE_WRITE 	  0x12 // Return data at a specific zone and address.
+#define COMMAND_OPCODE_SHA 		  0x47 // Computes a SHA-256 or HMAC/SHA digest for general purpose use by the system.
 #define COMMAND_OPCODE_GENKEY 	0x40 // Creates a key (public and/or private) and stores it in a memory key slot
-#define COMMAND_OPCODE_NONCE 	0x16 // 
-#define COMMAND_OPCODE_SIGN 	0x41 // Create an ECC signature with contents of TempKey and designated key slot
+#define COMMAND_OPCODE_NONCE 	  0x16 // 
+#define COMMAND_OPCODE_SIGN 	  0x41 // Create an ECC signature with contents of TempKey and designated key slot
 #define COMMAND_OPCODE_VERIFY 	0x45 // takes an ECDSA <R,S> signature and verifies that it is correctly generated from a given message and public key
+#define COMMAND_OPCODE_AES      0x51 // AES encryption/decryption
+ 
 
 
 // SHA Params
@@ -78,6 +80,13 @@
 #define SHA_UPDATE					0b00000001
 #define SHA_END							0b00000010
 #define SHA_BLOCK_SIZE			64
+
+// AES paramaters
+
+#define AES_ENCRYPT                   0x00
+#define AES_DECRYPT                   0x01
+#define AES_BLOCKSIZE                 16      // size in bytes
+
 
 /* Protocol Sizes */
 #define ATRCC508A_PROTOCOL_FIELD_SIZE_COMMAND 1
@@ -95,21 +104,36 @@
 #define ATRCC508A_SUCCESSFUL_WAKEUP  0x11
 #define ATRCC508A_SUCCESSFUL_GETINFO 0x50 /* Revision number */
 
+// predefined status codes
+#define STATUS_SUCCESS                0x00
+#define STATUS_VERIFICATION_ERROR     0x01
+#define STATUS_PARSE_ERROR            0x03
+#define STATUS_ECC_FAULT              0x05
+#define STATUS_SELFTEST_ERROR         0x07
+#define STATUS_EXECUTION_ERROR        0x0F
+#define STATUS_WAKE_TOKEN_RECEIVED    0x11
+#define STATUS_WATCHDOG_EXPIRATION    0xEE
+#define STATUS_CRC_ERROR              0xFF
+
+// our own status codes
+#define STATUS_INVALID_PARAMETER      -1
+
 /* Receive constants */
 #define ATRCC508A_MAX_REQUEST_SIZE 32
 #define ATRCC508A_MAX_RETRIES 20
 
 /* configZone EEPROM mapping */
-#define CONFIG_ZONE_READ_SIZE    32
-#define CONFIG_ZONE_SERIAL_PART0    0
-#define CONFIG_ZONE_SERIAL_PART1    8
-#define CONFIG_ZONE_REVISION_NUMBER 4
-#define CONFIG_ZONE_SLOT_CONFIG 20
-#define CONFIG_ZONE_OTP_LOCK     86
-#define CONFIG_ZONE_LOCK_STATUS  87
-#define CONFIG_ZONE_SLOTS_LOCK0   88
-#define CONFIG_ZONE_SLOTS_LOCK1   89
-#define CONFIG_ZONE_KEY_CONFIG	  96
+#define CONFIG_ZONE_READ_SIZE       32
+#define CONFIG_ZONE_SERIAL_PART0     0
+#define CONFIG_ZONE_SERIAL_PART1     8
+#define CONFIG_ZONE_REVISION_NUMBER  4
+#define CONFIG_ZONE_AES_STATUS      13
+#define CONFIG_ZONE_SLOT_CONFIG     20
+#define CONFIG_ZONE_OTP_LOCK        86
+#define CONFIG_ZONE_LOCK_STATUS     87
+#define CONFIG_ZONE_SLOTS_LOCK0     88
+#define CONFIG_ZONE_SLOTS_LOCK1     89
+#define CONFIG_ZONE_KEY_CONFIG	    96
 
 
 // Lock command PARAM1 zone options (aka Mode). more info at table on datasheet page 75
@@ -221,12 +245,16 @@ class ATECCX08A {
 		boolean verifySignature(uint8_t *message, uint8_t *signature, uint8_t *publicKey); // external ECC publicKey only
 
 		boolean read(uint8_t zone, uint16_t address, uint8_t length, boolean debug = false);
-		boolean write(uint8_t zone, uint16_t address, uint8_t *data, uint8_t length_of_data);
-		boolean writeKey(uint16_t slot, uint8_t *data, uint8_t length);
+		boolean read(uint8_t zone, uint16_t address, uint8_t *response, uint8_t length, boolean debug = false);
+		boolean write(uint8_t zone, uint16_t address, const uint8_t *data, uint8_t length_of_data);
+		boolean writeSlot(int slot, const uint8_t *data, int length);
+    boolean readSlot(int slot, uint8_t *data, int length);
+    int addressForSlotOffset(int slot, int offset);
+		
+
 
 		boolean readConfigZone(boolean debug = true);
 		byte    *getConfigZone();
-		boolean sendCommand(uint8_t command_opcode, uint8_t param1, uint16_t param2, uint8_t *data = NULL, size_t length_of_data = 0);
 
 		// get lock states	
 		boolean getConfigLockStatus();
@@ -237,6 +265,17 @@ class ATECCX08A {
 	  boolean getRevisionNumber(uint8_t *revisionNo, int length);
     boolean getSignature(uint8_t *signature, int length);
 		
+		int getStatus();
+		boolean isAESEnabled();
+		boolean encrypt(uint8_t *clearText, int sizeClearText, uint8_t *encrypted, int sizeEncrypted, uint8_t slot, uint8_t keyIndex, boolean debug);
+		boolean decrypt(uint8_t *clearText, int sizeClearText, uint8_t *encrypted, int sizeEncrypted, uint8_t slot, uint8_t keyIndex, boolean debug);
+
+		
+	
+	protected:
+		boolean sendCommand(uint8_t command_opcode, uint8_t param1, uint16_t param2, const uint8_t *data = NULL, size_t length_of_data = 0, boolean debug=false);
+				
+	  void setStatus(int status);
 	
   private:
 
@@ -246,6 +285,7 @@ class ATECCX08A {
 		
   	byte configZone[128]; // used to store configuration zone bytes read from device EEPROM
   	byte inputBuffer[BUFFER_SIZE]; // used to store messages received from the IC as they come in
+    byte status;
   	boolean configLockStatus; // pulled from configZone[87], then set according to status (0x55=UNlocked, 0x00=Locked)
 	  boolean dataOTPLockStatus; // pulled from configZone[86], then set according to status (0x55=UNlocked, 0x00=Locked)
 	  boolean slot0LockStatus; // pulled from configZone[88], then set according to slot (bit 0) status
@@ -254,9 +294,9 @@ class ATECCX08A {
 	  uint8_t serialNumber[SERIAL_NUMBER_SIZE]; // used to store the complete Serial number, pulled from configZone[0-3] and configZone[8-12]
   	byte publicKey64Bytes[64]; // used to store the public key returned when you (1) create a keypair, or (2) read a public key
 	  uint8_t signature[SIGNATURE_SIZE];
-	
 
-	
+		boolean encryptDecrypt(uint8_t *clearText, int sizeClearText, uint8_t *encrypted, int sizeEncrypted, uint8_t slot, uint8_t keyIndex, uint8_t mode, boolean debug=false);
+	  void printHexValue(byte value);
 	
 };
 
