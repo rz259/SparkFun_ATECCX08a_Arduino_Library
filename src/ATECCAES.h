@@ -33,5 +33,6 @@ class ATECCAES
 		int         status;
 
 	  void setStatus(int status);
-	
+	  void printHexValue(byte value);
+		void printHexValue(byte value[], int length, char *separator);
 };

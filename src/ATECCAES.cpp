@@ -14,6 +14,7 @@ boolean ATECCAES::encrypt(uint8_t *plainText, int sizePlainText, uint8_t *encryp
 	boolean result;
 	int     iterations, offset;
 	PaddingType  padding;
+	uint8_t *inputBuffer = NULL;
 	
 	padding = getPadding();
 	if (padding == NoPadding)
@@ -38,6 +39,14 @@ boolean ATECCAES::encrypt(uint8_t *plainText, int sizePlainText, uint8_t *encryp
 				setStatus(ATECCAES_OUTPUT_LENGTH_TOO_SMALL);
 				return false;
 			}
+			int sizeNeeded = ((sizePlainText / AES_BLOCKSIZE) + 1) * AES_BLOCKSIZE;
+			inputBuffer = (uint8_t *) calloc(1, sizeNeeded);
+			memcpy(inputBuffer, plainText, sizePlainText);
+			// now append padding bytes
+			int paddingBytes = sizeNeeded - sizePlainText;
+			Serial.println("paddingBytes : " + String(paddingBytes));
+			memset(&inputBuffer[sizePlainText], paddingBytes, paddingBytes);
+			printHexValue(inputBuffer, sizeNeeded, " ");
 		}
 		else 
 		{
@@ -48,18 +57,29 @@ boolean ATECCAES::encrypt(uint8_t *plainText, int sizePlainText, uint8_t *encryp
 				setStatus(ATECCAES_OUTPUT_LENGTH_TOO_SMALL);
 				return false;
 			}
+			inputBuffer = plainText;
 		}
 	}
 	
-	// TODO: consider padding case!
 	int bytesEncrypted = 0;
 	iterations = sizePlainText / AES_BLOCKSIZE;
+	if ((sizePlainText % AES_BLOCKSIZE) != 0)
+	{
+	  iterations++;	
+	}
+	
 	for (int index = 0; index < iterations; index++)
 	{
 		offset = index * AES_BLOCKSIZE;
-	  result = atecc->encryptDecryptBlock(&plainText[offset], AES_BLOCKSIZE, &encrypted[offset], AES_BLOCKSIZE, slot, keyIndex, AES_ENCRYPT, debug);
+	  result = atecc->encryptDecryptBlock(&inputBuffer[offset], AES_BLOCKSIZE, &encrypted[offset], AES_BLOCKSIZE, slot, keyIndex, AES_ENCRYPT, debug);
 		if (result == false)
+		{
+			if (inputBuffer != NULL && inputBuffer != plainText)
+			{
+				free(inputBuffer);
+			}	
 			return result;
+		}
 		bytesEncrypted += AES_BLOCKSIZE;
 	}
 	// handle special case we need to append a block
@@ -72,12 +92,20 @@ boolean ATECCAES::encrypt(uint8_t *plainText, int sizePlainText, uint8_t *encryp
 		offset += AES_BLOCKSIZE;
 		result = atecc->encryptDecryptBlock(padding, AES_BLOCKSIZE, &encrypted[offset], AES_BLOCKSIZE, slot, keyIndex, AES_ENCRYPT, debug);
 		if (result == false)
+		{
+			if (inputBuffer != NULL && inputBuffer != plainText)
+			{
+				free(inputBuffer);
+			}	
 			return result;
+		}
+
  		bytesEncrypted += AES_BLOCKSIZE;
 	}
   // printHexValue(output, outputSize, " ");	
 	setStatus(ATECCAES_SUCCESS);
 	*sizeEncrypted = bytesEncrypted;
+	Serial.println("*sizeEncrypted = " + String(*sizeEncrypted));
 	return true;
 }
 
@@ -126,7 +154,12 @@ boolean ATECCAES::decrypt(uint8_t *encrypted, int sizeEncrypted, uint8_t *decryp
 	// TODO: consider padding case!
 	
 	int bytesDecrypted = 0;
-	iterations = (sizeEncrypted / AES_BLOCKSIZE) -1;
+	iterations = (sizeEncrypted / AES_BLOCKSIZE) - 1;
+  if ((sizeEncrypted % AES_BLOCKSIZE) != 0)
+	{
+	  iterations++;	
+	}
+
 	for (int index = 0; index < iterations; index++)
 	{
 		offset = index * AES_BLOCKSIZE;
@@ -136,27 +169,41 @@ boolean ATECCAES::decrypt(uint8_t *encrypted, int sizeEncrypted, uint8_t *decryp
 		bytesDecrypted += AES_BLOCKSIZE;
 	}
 	
-	// handle special case we need to remove the last block 
-	if (padding == PKCS7Padding && (sizeEncrypted % AES_BLOCKSIZE) == 0)
+	// handle special case we need to remove the last block or delete padding bytes from last block
+	if (padding == PKCS7Padding)
 	{
-    uint8_t padding[AES_BLOCKSIZE];
-		
-		// First decrypt last block
-		offset += AES_BLOCKSIZE;
-		result = atecc->encryptDecryptBlock(&encrypted[offset], AES_BLOCKSIZE, padding, AES_BLOCKSIZE, slot, keyIndex, AES_DECRYPT, debug);
-		Serial.println("Result endryptDecryptBlock padding: " + result);
-		// bytesDecrypted += AES_BLOCKSIZE;
-		
-		// verify if last input block only contains 0x10
-		Serial.println("Verifying block for padding, offset = " + String(offset));
-		for (int index = 0; index < AES_BLOCKSIZE; index++)
+		if ((sizeEncrypted % AES_BLOCKSIZE) == 0)
 		{
-			Serial.println("Pos: " + String(index+offset) + ", Value : " + String(padding[index]));
-			if (padding[index] != 0x10)
+			// we need to remove the last block completely
+			uint8_t padding[AES_BLOCKSIZE];
+			
+			// First decrypt last block
+			offset += AES_BLOCKSIZE;
+			result = atecc->encryptDecryptBlock(&encrypted[offset], AES_BLOCKSIZE, padding, AES_BLOCKSIZE, slot, keyIndex, AES_DECRYPT, debug);
+			Serial.println("Result endryptDecryptBlock padding: " + result);
+			// bytesDecrypted += AES_BLOCKSIZE;
+			
+			// verify if last input block only contains 0x10
+			Serial.println("Verifying block for padding, offset = " + String(offset));
+			for (int index = 0; index < AES_BLOCKSIZE; index++)
 			{
-				setStatus(ATECCAES_PADDING_ERROR);
-				return false;
+				Serial.println("Pos: " + String(index+offset) + ", Value : " + String(padding[index]));
+				if (padding[index] != 0x10)
+				{
+					setStatus(ATECCAES_PADDING_ERROR);
+					return false;
+				}
 			}
+		}
+		else
+		{
+			// delete padding bytes from last block
+			uint8_t paddingValue;
+			
+			paddingValue = decrypted[bytesDecrypted-1];
+			bytesDecrypted -= paddingValue;
+			offset = sizeEncrypted - paddingValue;
+			memset(&decrypted[offset], 0, paddingValue);
 		}
 	}
   // printHexValue(output, outputSize, " ");	
@@ -180,4 +227,22 @@ int ATECCAES::getStatus()
 void  ATECCAES::setStatus(int status)
 {
 	this->status = status;
+}
+
+
+void ATECCAES::printHexValue(byte value)
+{
+	if ((value >> 4) == 0) 
+		Serial.print("0"); // print preceeding high nibble if it's zero
+	Serial.print(value, HEX);
+}
+
+void ATECCAES::printHexValue(byte value[], int length, char *separator)
+{
+	for (int index = 0; index < length; index++)
+	{
+		printHexValue(value[index]);
+	 Serial.print(String(separator));
+	}
+	Serial.println();
 }
