@@ -14,7 +14,7 @@ boolean ATECCAES::encrypt(uint8_t *plainText, int sizePlainText, uint8_t *encryp
 	boolean result;
 	int     iterations, offset;
 	PaddingType  padding;
-	uint8_t *inputBuffer = NULL;
+	uint8_t *inputBuffer = plainText;
 	
 	padding = getPadding();
 	if (padding == NoPadding)
@@ -193,11 +193,16 @@ boolean ATECCAES::decrypt(uint8_t *encrypted, int sizeEncrypted, uint8_t *decryp
 
     // now copy the decryptBuffer to the parameter decrypted in the correct length
 		memcpy(decrypted, decryptBuffer, offset);
+  	*sizeDecrypted = offset;
+	}
+	else
+	{
+		memcpy(decrypted, decryptBuffer, bytesDecrypted);
+  	*sizeDecrypted = bytesDecrypted;
 	}
 	Serial.print("final decrypted output:");
-  printHexValue(decrypted, offset, " ");	
+  printHexValue(decrypted, *sizeDecrypted, " ");	
 	setStatus(ATECCAES_SUCCESS);
-	*sizeDecrypted = offset;
 	return true;
 }
 
