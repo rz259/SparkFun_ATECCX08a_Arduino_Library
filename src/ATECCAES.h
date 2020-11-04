@@ -35,4 +35,8 @@ class ATECCAES
 	  void setStatus(int status);
 	  void printHexValue(byte value);
 		void printHexValue(byte value[], int length, char *separator);
+		int  calcSizeNeeded(int length);
+		void appendPadding(uint8_t *data, int sizePlainText, int totalSize);
+		boolean performChecksForEncryption(int sizePlainText, int sizeEncrypted);
+		uint8_t *initInputBuffer(uint8_t *plainText, int sizePlainText, int &totalSize);
 };
