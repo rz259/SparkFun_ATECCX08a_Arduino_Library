@@ -17,12 +17,17 @@ typedef enum PaddingType
   PKCS7Padding
 }	PaddingType;
 
+typedef enum AESMode
+{
+	ECB,
+	CBC
+} AESMode;
+
 class ATECCAES
 {
 
   public:
-	  ATECCAES(ATECCX08A *atecc, PaddingType padding);
-		PaddingType getPadding();
+	  ATECCAES(ATECCX08A *atecc, PaddingType padding, AESMode mode);
 		int         getStatus();
     boolean encrypt(uint8_t *plainText, int sizePlainText, uint8_t *encrypted, int &sizeEncrypted, uint8_t slot, uint8_t keyIndex, boolean debug = false);
     boolean decrypt(uint8_t *encrypted, int sizeEncrypted, uint8_t *decrypted, int &sizeDecrypted, uint8_t slot, uint8_t keyIndex, boolean debug = false);
@@ -30,13 +35,18 @@ class ATECCAES
 	private:
 	  ATECCX08A *atecc;
 		PaddingType padding;
+		AESMode     mode;
 		int         status;
 
+		PaddingType getPadding();
 	  void setStatus(int status);
+		AESMode getMode();
 	  void printHexValue(byte value);
 		void printHexValue(byte value[], int length, char *separator);
 		int  calcSizeNeeded(int length);
 		void appendPadding(uint8_t *data, int sizePlainText, int totalSize);
+		boolean removePadding(uint8_t *decryptBuffer, int &bytesDecrypted);
 		boolean performChecksForEncryption(int sizePlainText, int sizeEncrypted);
+    boolean performChecksForDecryption(int sizeEncrypted, int sizeDecrypted);
 		uint8_t *initInputBuffer(uint8_t *plainText, int sizePlainText, int &totalSize);
 };

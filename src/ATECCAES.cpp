@@ -3,16 +3,17 @@
 #include "ATECCAES.h"
 
 
-ATECCAES::ATECCAES(ATECCX08A *atecc, PaddingType padding)
+ATECCAES::ATECCAES(ATECCX08A *atecc, PaddingType padding, AESMode mode)
 {
 	this->atecc = atecc;
 	this->padding = padding;
+	this->mode    = mode;
 }
 
 boolean ATECCAES::encrypt(uint8_t *plainText, int sizePlainText, uint8_t *encrypted, int &sizeEncrypted, uint8_t slot, uint8_t keyIndex, boolean debug)
 {
 	boolean result;
-	int     iterations, offset, totalSize, bytesEncrypted = 0;
+	int     blocks, offset, totalSize, bytesEncrypted = 0;
   uint8_t *inputBuffer = NULL;
 	
 	result = performChecksForEncryption(sizePlainText, sizeEncrypted);
@@ -22,8 +23,8 @@ boolean ATECCAES::encrypt(uint8_t *plainText, int sizePlainText, uint8_t *encryp
 	}
 
   inputBuffer = initInputBuffer(plainText, sizePlainText, totalSize);
-	iterations = totalSize / AES_BLOCKSIZE;
-	for (int index = 0; index < iterations; index++)
+	blocks = totalSize / AES_BLOCKSIZE;
+	for (int index = 0; index < blocks; index++)
 	{
 		offset = index * AES_BLOCKSIZE;
 	  result = atecc->encryptDecryptBlock(&inputBuffer[offset], AES_BLOCKSIZE, &encrypted[offset], AES_BLOCKSIZE, slot, keyIndex, AES_ENCRYPT, debug);
@@ -43,92 +44,39 @@ boolean ATECCAES::encrypt(uint8_t *plainText, int sizePlainText, uint8_t *encryp
 boolean ATECCAES::decrypt(uint8_t *encrypted, int sizeEncrypted, uint8_t *decrypted, int &sizeDecrypted, uint8_t slot, uint8_t keyIndex, boolean debug)
 {
 	boolean result;
-	int     iterations, offset;
-	PaddingType  padding;
-	
-	padding = getPadding();
-	if (padding == NoPadding)
-	{		
-    if ((sizeEncrypted % AES_BLOCKSIZE) != 0)
-		{
-			setStatus(ATECCAES_INVALID_INPUT_LENGTH);
-			return false;
-	  }	
-		if (sizeDecrypted < sizeEncrypted)
-		{
-			setStatus(ATECCAES_OUTPUT_LENGTH_TOO_SMALL);
-			return false;
-		}
-	}
-	else if (padding == PKCS7Padding)
-	{
-    if ((sizeEncrypted % AES_BLOCKSIZE) != 0)		// last block is not fully used
-		{
-			if (sizeDecrypted < sizeEncrypted)  // outputSize must be at least as long als inputSize
-			{
-				setStatus(ATECCAES_OUTPUT_LENGTH_TOO_SMALL);
-				return false;
-			}
-		}
-		else 
-		{
-			// we need to append an additional block for padding
-			if ((sizeEncrypted - AES_BLOCKSIZE) > sizeDecrypted)
-			{
-				setStatus(ATECCAES_INPUT_LENGTH_TOO_SMALL);
-				return false;
-			}
-		}
-	}
-	
+	int     blocks, offset;
 	int bytesDecrypted = 0;
-	iterations = (sizeEncrypted / AES_BLOCKSIZE);
-
-	uint8_t decryptBuffer[sizeEncrypted];
-	for (int index = 0; index < iterations; index++)
+	uint8_t   *decryptBuffer;
+		
+	result = performChecksForDecryption(sizeEncrypted, sizeDecrypted);
+  if (result == false)	
+	{
+		return result;
+	}
+	
+	blocks = (sizeEncrypted / AES_BLOCKSIZE);
+	decryptBuffer = (uint8_t *) calloc(1, sizeEncrypted);
+	for (int index = 0; index < blocks; index++)
 	{
 		offset = index * AES_BLOCKSIZE;
 	  result = atecc->encryptDecryptBlock(&encrypted[offset], AES_BLOCKSIZE, &decryptBuffer[offset], AES_BLOCKSIZE, slot, keyIndex, AES_DECRYPT, debug);
 		if (result == false)
+		{
+			free(decryptBuffer);
 			return result;
+		}
 		bytesDecrypted += AES_BLOCKSIZE;
 	}
-
-//  Serial.print("decryptBuffer: ");
-//  printHexValue(decryptBuffer, bytesDecrypted, " ");	
-
-	// handle padding
-	if (padding == PKCS7Padding)
+	result = removePadding(decryptBuffer, bytesDecrypted);
+	if (result == false)
 	{
-		// the last byte of the buffer contains the padding byte value. The value must be in range 1 - 0x10
-		uint8_t paddingByte = decryptBuffer[sizeEncrypted-1];
-		
-		if (paddingByte == 0x00 || paddingByte > 0x10)
-		{
-			setStatus(ATECCAES_PADDING_ERROR);
-			return false;
-		}
-		// now check, if there are the correct number of padding bytes present
-		offset = sizeEncrypted - paddingByte;
-		for (int index = offset; index < sizeEncrypted; index++)
-		{
-//			Serial.println("Pos: " + String(index) + ", Value : " + String(decryptBuffer[index]));
-			if (decryptBuffer[index] != paddingByte)
-			{
-				setStatus(ATECCAES_PADDING_ERROR);
-				return false;
-			}
-		}
-
-    // now copy the decryptBuffer to the parameter decrypted in the correct length
-		memcpy(decrypted, decryptBuffer, offset);
-  	sizeDecrypted = offset;
+		return result;
 	}
-	else
-	{
-		memcpy(decrypted, decryptBuffer, bytesDecrypted);
-  	sizeDecrypted = bytesDecrypted;
-	}
+	
+  // now copy the decryptBuffer to the parameter decrypted in the correct length
+  memcpy(decrypted, decryptBuffer, bytesDecrypted);
+  sizeDecrypted = bytesDecrypted;
+	free(decryptBuffer);
 	setStatus(ATECCAES_SUCCESS);
 	return true;
 }
@@ -149,6 +97,11 @@ void  ATECCAES::setStatus(int status)
 	this->status = status;
 }
 
+
+AESMode ATECCAES::getMode()
+{
+	return mode;
+}
 
 void ATECCAES::printHexValue(byte value)
 {
@@ -195,6 +148,37 @@ void ATECCAES::appendPadding(uint8_t *data, int sizePlainText, int totalSize)
 	}
 }
 
+boolean ATECCAES::removePadding(uint8_t *decryptBuffer, int &bytesDecrypted)
+{
+	PaddingType  padding;
+	int          offset;
+	
+	padding = getPadding();
+	if (padding == PKCS7Padding)
+	{
+		// the last byte of the buffer contains the padding byte value. The value must be in range 1 - 0x10
+		uint8_t paddingByte = decryptBuffer[bytesDecrypted-1];
+		
+		if (paddingByte == 0x00 || paddingByte > 0x10)
+		{
+			setStatus(ATECCAES_PADDING_ERROR);
+			return false;
+		}
+		// now check, if the correct number of padding bytes present
+		offset = bytesDecrypted - paddingByte;
+		for (int index = offset; index < bytesDecrypted; index++)
+		{
+			if (decryptBuffer[index] != paddingByte)
+			{
+				setStatus(ATECCAES_PADDING_ERROR);
+				return false;
+			}
+		}
+    bytesDecrypted = offset;
+	}
+	return true;
+}
+
 boolean ATECCAES::performChecksForEncryption(int sizePlainText, int sizeEncrypted)
 {
 	PaddingType  padding;
@@ -217,6 +201,22 @@ boolean ATECCAES::performChecksForEncryption(int sizePlainText, int sizeEncrypte
 	}
 	return true;
 }
+
+boolean ATECCAES::performChecksForDecryption(int sizeEncrypted, int sizeDecrypted)
+{
+	if ((sizeEncrypted % AES_BLOCKSIZE) != 0)
+	{
+		setStatus(ATECCAES_INVALID_INPUT_LENGTH);
+		return false;
+  }	
+	if (sizeDecrypted < sizeEncrypted)
+	{
+		setStatus(ATECCAES_OUTPUT_LENGTH_TOO_SMALL);
+		return false;
+	}
+  return true;
+}
+
 
 uint8_t * ATECCAES::initInputBuffer(uint8_t *plainText, int sizePlainText, int &totalSize)
 {
