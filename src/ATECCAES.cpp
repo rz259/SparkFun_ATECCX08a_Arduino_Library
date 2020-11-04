@@ -3,14 +3,33 @@
 #include "ATECCAES.h"
 
 
-ATECCAES::ATECCAES(ATECCX08A *atecc, PaddingType padding, AESMode mode)
+ATECCAES::ATECCAES(ATECCX08A *atecc, PaddingType padding, AESMode mode, byte *iv)
 {
 	this->atecc = atecc;
 	this->padding = padding;
 	this->mode    = mode;
+	this->iv      = iv;
 }
 
 boolean ATECCAES::encrypt(uint8_t *plainText, int sizePlainText, uint8_t *encrypted, int &sizeEncrypted, uint8_t slot, uint8_t keyIndex, boolean debug)
+{
+	boolean result;
+
+  switch(mode)	
+	{
+		case ECB: 
+		  return encryptECB(plainText, sizePlainText, encrypted, sizeEncrypted, slot, keyIndex, debug);
+			
+		case CBC: 
+		  return encryptCBC(plainText, sizePlainText, encrypted, sizeEncrypted, slot, keyIndex, debug);
+			
+		default: 
+		  return false;
+	}
+	
+}
+
+boolean ATECCAES::encryptECB(uint8_t *plainText, int sizePlainText, uint8_t *encrypted, int &sizeEncrypted, uint8_t slot, uint8_t keyIndex, boolean debug)
 {
 	boolean result;
 	int     blocks, offset, totalSize, bytesEncrypted = 0;
@@ -41,7 +60,45 @@ boolean ATECCAES::encrypt(uint8_t *plainText, int sizePlainText, uint8_t *encryp
 	return true;
 }
 
-boolean ATECCAES::decrypt(uint8_t *encrypted, int sizeEncrypted, uint8_t *decrypted, int &sizeDecrypted, uint8_t slot, uint8_t keyIndex, boolean debug)
+boolean ATECCAES::encryptCBC(uint8_t *plainText, int sizePlainText, uint8_t *encrypted, int &sizeEncrypted, uint8_t slot, uint8_t keyIndex, boolean debug)
+{
+	boolean result;
+	int     blocks, offset, totalSize, bytesEncrypted = 0;
+  uint8_t *inputBuffer = NULL;
+	uint8_t ivBlock[AES_BLOCKSIZE];
+	
+	result = performChecksForEncryption(sizePlainText, sizeEncrypted);
+	if (result == false)
+	{
+		return result;
+	}
+
+  inputBuffer = initInputBuffer(plainText, sizePlainText, totalSize);
+	blocks = totalSize / AES_BLOCKSIZE;
+	memcpy(ivBlock, iv, AES_BLOCKSIZE);
+	
+	for (int index = 0; index < blocks; index++)
+	{
+		offset = index * AES_BLOCKSIZE;
+		xorBlock(&inputBuffer[offset], ivBlock, AES_BLOCKSIZE);
+	  result = atecc->encryptDecryptBlock(&inputBuffer[offset], AES_BLOCKSIZE, &encrypted[offset], AES_BLOCKSIZE, slot, keyIndex, AES_ENCRYPT, debug);
+		
+		if (result == false)
+		{
+			free(inputBuffer);
+			return result;
+		}
+		bytesEncrypted += AES_BLOCKSIZE;
+    memcpy(ivBlock, encrypted, AES_BLOCKSIZE);
+  }
+	setStatus(ATECCAES_SUCCESS);
+	sizeEncrypted = bytesEncrypted;
+	free(inputBuffer);
+	return true;
+}
+
+
+boolean ATECCAES::decryptECB(uint8_t *encrypted, int sizeEncrypted, uint8_t *decrypted, int &sizeDecrypted, uint8_t slot, uint8_t keyIndex, boolean debug)
 {
 	boolean result;
 	int     blocks, offset;
@@ -80,6 +137,65 @@ boolean ATECCAES::decrypt(uint8_t *encrypted, int sizeEncrypted, uint8_t *decryp
 	setStatus(ATECCAES_SUCCESS);
 	return true;
 }
+
+boolean ATECCAES::decryptCBC(uint8_t *encrypted, int sizeEncrypted, uint8_t *decrypted, int &sizeDecrypted, uint8_t slot, uint8_t keyIndex, boolean debug)
+{
+	boolean result;
+	int     blocks, offset;
+	int bytesDecrypted = 0;
+	uint8_t   *decryptBuffer;
+	uint8_t   ivBlock[AES_BLOCKSIZE];
+		
+	result = performChecksForDecryption(sizeEncrypted, sizeDecrypted);
+  if (result == false)	
+	{
+		return result;
+	}
+	
+	blocks = (sizeEncrypted / AES_BLOCKSIZE);
+	decryptBuffer = (uint8_t *) calloc(1, sizeEncrypted);
+	memcpy(ivBlock, iv, AES_BLOCKSIZE);
+	for (int index = 0; index < blocks; index++)
+	{
+		offset = index * AES_BLOCKSIZE;
+	  result = atecc->encryptDecryptBlock(&encrypted[offset], AES_BLOCKSIZE, &decryptBuffer[offset], AES_BLOCKSIZE, slot, keyIndex, AES_DECRYPT, debug);
+		if (result == false)
+		{
+			free(decryptBuffer);
+			return result;
+		}
+		bytesDecrypted += AES_BLOCKSIZE;
+		xorBlock(&decryptBuffer[offset], ivBlock, AES_BLOCKSIZE);
+  	memcpy(ivBlock, &encrypted[offset], AES_BLOCKSIZE);
+	}
+	result = removePadding(decryptBuffer, bytesDecrypted);
+	if (result == false)
+	{
+		return result;
+	}
+	
+  // now copy the decryptBuffer to the parameter decrypted in the correct length
+  memcpy(decrypted, decryptBuffer, bytesDecrypted);
+  sizeDecrypted = bytesDecrypted;
+	free(decryptBuffer);
+	setStatus(ATECCAES_SUCCESS);
+	return true;
+}
+
+boolean ATECCAES::decrypt(uint8_t *encrypted, int sizeEncrypted, uint8_t *decrypted, int &sizeDecrypted, uint8_t slot, uint8_t keyIndex, boolean debug)
+{
+	switch(mode)
+	{
+		case ECB : 
+		  return decryptECB(encrypted, sizeEncrypted, decrypted, sizeDecrypted, slot, keyIndex, debug);
+
+		case CBC : 
+		  return decryptCBC(encrypted, sizeEncrypted, decrypted, sizeDecrypted, slot, keyIndex, debug);
+	}
+	
+	return false;
+}
+
 
 
 PaddingType ATECCAES::getPadding()
@@ -227,4 +343,13 @@ uint8_t * ATECCAES::initInputBuffer(uint8_t *plainText, int sizePlainText, int &
 	memcpy(inputBuffer, plainText, sizePlainText);
   appendPadding(inputBuffer, sizePlainText, totalSize);   // if necessary, append padding
 	return inputBuffer;
+}
+
+
+void  ATECCAES::xorBlock(uint8_t *data, uint8_t *block, int size)
+{
+	for (int index = 0; index < size; index++)
+	{
+		data[index] ^= block[index];
+	}
 }
