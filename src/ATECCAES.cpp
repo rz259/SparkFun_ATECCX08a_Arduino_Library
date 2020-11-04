@@ -226,7 +226,7 @@ void ATECCAES::printHexValue(byte value)
 	Serial.print(value, HEX);
 }
 
-void ATECCAES::printHexValue(byte value[], int length, char *separator)
+void ATECCAES::printHexValue(const uint8_t *value, int length, const char *separator)
 {
 	for (int index = 0; index < length; index++)
 	{

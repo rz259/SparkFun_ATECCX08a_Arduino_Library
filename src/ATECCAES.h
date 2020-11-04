@@ -46,8 +46,8 @@ class ATECCAES
 		PaddingType getPadding();
 	  void setStatus(int status);
 		AESMode getMode();
-	  void printHexValue(byte value);
-		void printHexValue(byte value[], int length, char *separator);
+	  void printHexValue(uint8_t value);
+		void printHexValue(const uint8_t *value, int length, const char *separator);
 		int  calcSizeNeeded(int length);
 		void appendPadding(uint8_t *data, int sizePlainText, int totalSize);
 		boolean removePadding(uint8_t *decryptBuffer, int &bytesDecrypted);
