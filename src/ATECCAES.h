@@ -24,8 +24,8 @@ class ATECCAES
 	  ATECCAES(ATECCX08A *atecc, PaddingType padding);
 		PaddingType getPadding();
 		int         getStatus();
-    boolean encrypt(uint8_t *plainText, int sizePlainText, uint8_t *encrypted, int *sizeEncrypted, uint8_t slot, uint8_t keyIndex, boolean debug = false);
-    boolean decrypt(uint8_t *encrypted, int sizeEncrypted, uint8_t *decrypted, int *sizeDecrypted, uint8_t slot, uint8_t keyIndex, boolean debug = false);
+    boolean encrypt(uint8_t *plainText, int sizePlainText, uint8_t *encrypted, int &sizeEncrypted, uint8_t slot, uint8_t keyIndex, boolean debug = false);
+    boolean decrypt(uint8_t *encrypted, int sizeEncrypted, uint8_t *decrypted, int &sizeDecrypted, uint8_t slot, uint8_t keyIndex, boolean debug = false);
 		
 	private:
 	  ATECCX08A *atecc;

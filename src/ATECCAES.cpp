@@ -9,7 +9,7 @@ ATECCAES::ATECCAES(ATECCX08A *atecc, PaddingType padding)
 	this->padding = padding;
 }
 
-boolean ATECCAES::encrypt(uint8_t *plainText, int sizePlainText, uint8_t *encrypted, int *sizeEncrypted, uint8_t slot, uint8_t keyIndex, boolean debug)
+boolean ATECCAES::encrypt(uint8_t *plainText, int sizePlainText, uint8_t *encrypted, int &sizeEncrypted, uint8_t slot, uint8_t keyIndex, boolean debug)
 {
 	boolean result;
 	int     iterations, offset;
@@ -24,7 +24,7 @@ boolean ATECCAES::encrypt(uint8_t *plainText, int sizePlainText, uint8_t *encryp
 			setStatus(ATECCAES_INVALID_INPUT_LENGTH);
 			return false;
 	  }	
-		if (*sizeEncrypted < sizePlainText)
+		if (sizeEncrypted < sizePlainText)
 		{
 			setStatus(ATECCAES_OUTPUT_LENGTH_TOO_SMALL);
 			return false;
@@ -34,7 +34,7 @@ boolean ATECCAES::encrypt(uint8_t *plainText, int sizePlainText, uint8_t *encryp
 	{
     if ((sizePlainText % AES_BLOCKSIZE) != 0)		// last block is not fully used
 		{
-			if (*sizeEncrypted < sizePlainText)  // outputSize must be at least as long als inputSize
+			if (sizeEncrypted < sizePlainText)  // outputSize must be at least as long als inputSize
 			{
 				setStatus(ATECCAES_OUTPUT_LENGTH_TOO_SMALL);
 				return false;
@@ -44,15 +44,15 @@ boolean ATECCAES::encrypt(uint8_t *plainText, int sizePlainText, uint8_t *encryp
 			memcpy(inputBuffer, plainText, sizePlainText);
 			// now append padding bytes
 			int paddingBytes = sizeNeeded - sizePlainText;
-			Serial.println("paddingBytes : " + String(paddingBytes));
 			memset(&inputBuffer[sizePlainText], paddingBytes, paddingBytes);
-			printHexValue(inputBuffer, sizeNeeded, " ");
+			// Serial.println("paddingBytes : " + String(paddingBytes));
+			// printHexValue(inputBuffer, sizeNeeded, " ");
 		}
 		else 
 		{
-			Serial.println("Mode : AES_ENCYPT, inputSize :" + String(sizePlainText) + ", outputSize : " + String(*sizeEncrypted));
+			// Serial.println("Mode : AES_ENCYPT, inputSize :" + String(sizePlainText) + ", outputSize : " + String(sizeEncrypted));
 			// we need to append an additional block for padding
-			if (*sizeEncrypted < (sizePlainText + AES_BLOCKSIZE))
+			if (sizeEncrypted < (sizePlainText + AES_BLOCKSIZE))
 			{
 				setStatus(ATECCAES_OUTPUT_LENGTH_TOO_SMALL);
 				return false;
@@ -87,7 +87,7 @@ boolean ATECCAES::encrypt(uint8_t *plainText, int sizePlainText, uint8_t *encryp
 	{
 		uint8_t padding[AES_BLOCKSIZE];
 		
-		Serial.println("Appending block for padding");
+		// Serial.println("Appending block for padding");
 		memset(padding, 0x10, 16);
 		offset += AES_BLOCKSIZE;
 		result = atecc->encryptDecryptBlock(padding, AES_BLOCKSIZE, &encrypted[offset], AES_BLOCKSIZE, slot, keyIndex, AES_ENCRYPT, debug);
@@ -103,7 +103,7 @@ boolean ATECCAES::encrypt(uint8_t *plainText, int sizePlainText, uint8_t *encryp
  		bytesEncrypted += AES_BLOCKSIZE;
 	}
 	setStatus(ATECCAES_SUCCESS);
-	*sizeEncrypted = bytesEncrypted;
+	sizeEncrypted = bytesEncrypted;
 	if (inputBuffer != NULL && inputBuffer != plainText)
 	{
 		free(inputBuffer);
@@ -111,7 +111,7 @@ boolean ATECCAES::encrypt(uint8_t *plainText, int sizePlainText, uint8_t *encryp
 	return true;
 }
 
-boolean ATECCAES::decrypt(uint8_t *encrypted, int sizeEncrypted, uint8_t *decrypted, int *sizeDecrypted, uint8_t slot, uint8_t keyIndex, boolean debug)
+boolean ATECCAES::decrypt(uint8_t *encrypted, int sizeEncrypted, uint8_t *decrypted, int &sizeDecrypted, uint8_t slot, uint8_t keyIndex, boolean debug)
 {
 	boolean result;
 	int     iterations, offset;
@@ -125,7 +125,7 @@ boolean ATECCAES::decrypt(uint8_t *encrypted, int sizeEncrypted, uint8_t *decryp
 			setStatus(ATECCAES_INVALID_INPUT_LENGTH);
 			return false;
 	  }	
-		if (*sizeDecrypted < sizeEncrypted)
+		if (sizeDecrypted < sizeEncrypted)
 		{
 			setStatus(ATECCAES_OUTPUT_LENGTH_TOO_SMALL);
 			return false;
@@ -135,7 +135,7 @@ boolean ATECCAES::decrypt(uint8_t *encrypted, int sizeEncrypted, uint8_t *decryp
 	{
     if ((sizeEncrypted % AES_BLOCKSIZE) != 0)		// last block is not fully used
 		{
-			if (*sizeDecrypted < sizeEncrypted)  // outputSize must be at least as long als inputSize
+			if (sizeDecrypted < sizeEncrypted)  // outputSize must be at least as long als inputSize
 			{
 				setStatus(ATECCAES_OUTPUT_LENGTH_TOO_SMALL);
 				return false;
@@ -144,7 +144,7 @@ boolean ATECCAES::decrypt(uint8_t *encrypted, int sizeEncrypted, uint8_t *decryp
 		else 
 		{
 			// we need to append an additional block for padding
-			if ((sizeEncrypted - AES_BLOCKSIZE) > *sizeDecrypted)
+			if ((sizeEncrypted - AES_BLOCKSIZE) > sizeDecrypted)
 			{
 				setStatus(ATECCAES_INPUT_LENGTH_TOO_SMALL);
 				return false;
@@ -165,8 +165,8 @@ boolean ATECCAES::decrypt(uint8_t *encrypted, int sizeEncrypted, uint8_t *decryp
 		bytesDecrypted += AES_BLOCKSIZE;
 	}
 
-  Serial.print("decryptBuffer: ");
-  printHexValue(decryptBuffer, bytesDecrypted, " ");	
+//  Serial.print("decryptBuffer: ");
+//  printHexValue(decryptBuffer, bytesDecrypted, " ");	
 
 	// handle padding
 	if (padding == PKCS7Padding)
@@ -183,7 +183,7 @@ boolean ATECCAES::decrypt(uint8_t *encrypted, int sizeEncrypted, uint8_t *decryp
 		offset = sizeEncrypted - paddingByte;
 		for (int index = offset; index < sizeEncrypted; index++)
 		{
-			Serial.println("Pos: " + String(index) + ", Value : " + String(decryptBuffer[index]));
+//			Serial.println("Pos: " + String(index) + ", Value : " + String(decryptBuffer[index]));
 			if (decryptBuffer[index] != paddingByte)
 			{
 				setStatus(ATECCAES_PADDING_ERROR);
@@ -193,15 +193,13 @@ boolean ATECCAES::decrypt(uint8_t *encrypted, int sizeEncrypted, uint8_t *decryp
 
     // now copy the decryptBuffer to the parameter decrypted in the correct length
 		memcpy(decrypted, decryptBuffer, offset);
-  	*sizeDecrypted = offset;
+  	sizeDecrypted = offset;
 	}
 	else
 	{
 		memcpy(decrypted, decryptBuffer, bytesDecrypted);
-  	*sizeDecrypted = bytesDecrypted;
+  	sizeDecrypted = bytesDecrypted;
 	}
-	Serial.print("final decrypted output:");
-  printHexValue(decrypted, *sizeDecrypted, " ");	
 	setStatus(ATECCAES_SUCCESS);
 	return true;
 }
