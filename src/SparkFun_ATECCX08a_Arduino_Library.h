@@ -115,8 +115,13 @@
 #define STATUS_WATCHDOG_EXPIRATION    0xEE
 #define STATUS_CRC_ERROR              0xFF
 
+
 // our own status codes
-#define STATUS_INVALID_PARAMETER      -1
+#define STATUS_TIMEOUT_ERROR          0x1000
+#define STATUS_INVALID_PARAMETER      0x1001
+#define STATUS_MESSAGE_COUNT_ERROR    0x1002
+#define STATUS_MESSAGE_CRC_ERROR      0x1003
+#define STATUS_INPUT_BUFFER_TOO_SMALL 0x1004
 
 /* Receive constants */
 #define ATRCC508A_MAX_REQUEST_SIZE 32
@@ -234,9 +239,9 @@ class ATECCX08A {
 		void atca_calculate_crc(uint8_t length, const uint8_t *data);	
 		
 		// Key functions
-		boolean createNewKeyPair(uint16_t slot = 0x0000);
-		boolean generatePublicKey(uint16_t slot = 0x0000, boolean debug = true);
-		byte *getPublicKey();
+		boolean createNewKeyPair(uint8_t *publicKey, int size, uint16_t slot = 0x0000);
+		boolean generatePublicKey(uint8_t *publicKey, int size, uint16_t slot = 0x0000, boolean debug = true);
+		// byte *getPublicKey();
 		
 		
 		boolean createSignature(const uint8_t *data, uint16_t slot = 0x0000); 
@@ -273,7 +278,6 @@ class ATECCX08A {
 	  void setStatus(int status);
 	
   private:
-
 		TwoWire *_i2cPort;
 		uint8_t _i2caddr;
 		Stream *_debugSerial; //The generic connection to user's chosen serial hardware
@@ -287,9 +291,13 @@ class ATECCX08A {
 	  boolean slot0LockStatus; // pulled from configZone[88], then set according to slot (bit 0) status
 		uint8_t countGlobal = 0; // used to add up all the bytes on a long message. Important to reset before each new receiveMessageData();
   	uint8_t revisionNumber[REVISION_NUMBER_SIZE]; // used to store the complete revision number, pulled from configZone[4-7]
-	  uint8_t serialNumber[SERIAL_NUMBER_SIZE]; // used to store the complete Serial number, pulled from configZone[0-3] and configZone[8-12]
-  	byte publicKey64Bytes[64]; // used to store the public key returned when you (1) create a keypair, or (2) read a public key
+	  uint8_t serialNumber[SERIAL_NUMBER_SIZE]; // used to store the complete Serial number, pulled from configZone[0-3] and configZone[8-12]		
 	  uint8_t signature[SIGNATURE_SIZE];
+		
+		boolean beginSHA256();
+    boolean updateSHA256(const uint8_t *plainText, int length);
+		boolean endSHA256(uint8_t *hash, int size);
+
 
 	  void printHexValue(byte value);
 		void printHexValue(const byte *value, int length, const char *separator);

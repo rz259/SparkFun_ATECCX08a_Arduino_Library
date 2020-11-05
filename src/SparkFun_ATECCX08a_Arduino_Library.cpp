@@ -468,7 +468,7 @@ boolean ATECCX08A::receiveResponseData(uint8_t length, boolean debug)
   cleanInputBuffer();
   byte requestAttempts = 0; // keep track of how many times we've attempted to request, to break out if necessary
   
-  while(length)
+  while (length)
   {
     byte requestAmount; // amount of bytes to request, needed to pull in data 32 bytes at a time
 	  if (length > 32) 
@@ -494,7 +494,6 @@ boolean ATECCX08A::receiveResponseData(uint8_t length, boolean debug)
 
 	if (debug)
 	{
-//		_debugSerial->println("requestAttempts: " + String(requestAttempts));
 		_debugSerial->println("countGlobal    : " + String(countGlobal));
 		_debugSerial->print("inputBuffer: ");
 		for (int i = 0; i < countGlobal ; i++)
@@ -504,8 +503,15 @@ boolean ATECCX08A::receiveResponseData(uint8_t length, boolean debug)
 		}
 	_debugSerial->println();	  
   }
+  if (countGlobal == 0)
+	{
+		setStatus(STATUS_TIMEOUT_ERROR);
+	}
 	if (requestAttempts < maxRequests)
+	{
+		setStatus(STATUS_SUCCESS);
     return true;
+	}
 	else
 		return false;
 }
@@ -531,6 +537,7 @@ boolean ATECCX08A::checkCount(boolean debug)
   // Check count; the first byte sent from IC is count, and it should be equal to the actual message count
   if (inputBuffer[0] != countGlobal) 
   {
+		setStatus(STATUS_MESSAGE_COUNT_ERROR);
 	  if (debug) 
 			_debugSerial->println("Message Count Error");
 	  return false;
@@ -562,6 +569,7 @@ boolean ATECCX08A::checkCrc(boolean debug)
   
   if ( (inputBuffer[countGlobal-1] != crc[1]) || (inputBuffer[countGlobal-2] != crc[0]) )   // then check the CRCs.
   {
+		setStatus(STATUS_MESSAGE_COUNT_ERROR);
 	  if (debug) 
 			_debugSerial->println("Message CRC Error");
 	  return false;
@@ -634,38 +642,35 @@ void ATECCX08A::cleanInputBuffer()
 	Sparkfun Default Configuration Sketch calls this, and then locks the data/otp zones and slot 0.
 */
 
-boolean ATECCX08A::createNewKeyPair(uint16_t slot)
+boolean ATECCX08A::createNewKeyPair(uint8_t *publicKey, int size, uint16_t slot)
 {  
-  sendCommand(COMMAND_OPCODE_GENKEY, GENKEY_MODE_NEW_PRIVATE, slot);
-
+	sendCommand(COMMAND_OPCODE_GENKEY, GENKEY_MODE_NEW_PRIVATE, slot);
   delay(115); // time for IC to process command and exectute
 
   // Now let's read back from the IC.
-  
   if (receiveResponseData(64 + 2 + 1) == false) 
 	{
-		setStatus(STATUS_EXECUTION_ERROR);
 		return false; // public key (64), plus crc (2), plus count (1)
 	}
   idleMode();
   boolean checkCountResult = checkCount();
   boolean checkCrcResult = checkCrc();
-  
-  
-  // update publicKey64Bytes[] array
+
   if (checkCountResult && checkCrcResult) // check that it was a good message
   {
   	// we don't need the count value (which is currently the first byte of the inputBuffer)
-	  for (int i = 0 ; i < 64 ; i++) // for loop through to grab all but the first position (which is "count" of the message)
-	  {
-	    publicKey64Bytes[i] = inputBuffer[i + 1];
-  	}
-		setStatus(STATUS_SUCCESS);
-	  return true;
+		if (publicKey != NULL && size >= PUBLIC_KEY_SIZE)
+		{
+	    for (int i = 0 ; i < 64 ; i++) // for loop through to grab all but the first position (which is "count" of the message)
+	    {
+	      publicKey[i] = inputBuffer[i+1];
+  	  }
+		  setStatus(STATUS_SUCCESS);
+	    return true;
+		}
   }
   else 
 	{
-		setStatus(STATUS_EXECUTION_ERROR);
 		return false;
 	}
 }
@@ -685,17 +690,24 @@ boolean ATECCX08A::createNewKeyPair(uint16_t slot)
 	a global variable named publicKey64Bytes for later use.
 */
 
-boolean ATECCX08A::generatePublicKey(uint16_t slot, boolean debug)
+boolean ATECCX08A::generatePublicKey(uint8_t *publicKey, int size, uint16_t slot, boolean debug)
 {
+  if (publicKey == NULL)
+	{
+		setStatus(STATUS_INVALID_PARAMETER);
+		return false;
+	}
+	if (size < PUBLIC_KEY_SIZE)
+	{
+		setStatus(STATUS_INPUT_BUFFER_TOO_SMALL);
+    return false;		
+	}
   sendCommand(COMMAND_OPCODE_GENKEY, GENKEY_MODE_PUBLIC, slot);
-
   delay(115); // time for IC to process command and exectute
 
   // Now let's read back from the IC.
-  
   if (receiveResponseData(64 + 2 + 1) == false)
 	{ 
-		setStatus(STATUS_EXECUTION_ERROR);
     return false; // public key (64), plus crc (2), plus count (1)
 	}
   idleMode();
@@ -708,19 +720,19 @@ boolean ATECCX08A::generatePublicKey(uint16_t slot, boolean debug)
     // we don't need the count value (which is currently the first byte of the inputBuffer)
     for (int i = 0 ; i < 64 ; i++) // for loop through to grab all but the first position (which is "count" of the message)
     {
-      publicKey64Bytes[i] = inputBuffer[i + 1];
+      publicKey[i] = inputBuffer[i+1];
     }
 	
 		if (debug)
 		{
-			_debugSerial->println("This device's Public Key:");
+			_debugSerial->println("This device's Public Key for slot :" + String(slot));
 			_debugSerial->println();
 			_debugSerial->println("uint8_t publicKey[64] = {");
-			for (int i = 0; i < sizeof(publicKey64Bytes) ; i++)
+			for (int i = 0; i < size; i++)
 			{
 				_debugSerial->print("0x");
-				if ((publicKey64Bytes[i] >> 4) == 0) _debugSerial->print("0"); // print preceeding high nibble if it's zero
-				_debugSerial->print(publicKey64Bytes[i], HEX);
+				if ((publicKey[i] >> 4) == 0) _debugSerial->print("0"); // print preceeding high nibble if it's zero
+				_debugSerial->print(publicKey[i], HEX);
 				if (i != 63) _debugSerial->print(", ");
 				if ((63-i) % 16 == 0) _debugSerial->println();
 			}
@@ -995,6 +1007,9 @@ boolean ATECCX08A::createSignature(const uint8_t *data, uint16_t slot)
 {
   boolean loadTempKeyResult = loadTempKey(data);
   boolean signTempKeyResult = signTempKey(slot);
+	
+	Serial.println("createSignature for slot : " + String(slot));
+	Serial.println("loadTempKeyResult: " + String(loadTempKeyResult) + ", signTempKeyResult: " + String(signTempKeyResult));
   if (loadTempKeyResult && signTempKeyResult) 
 		return true;
   else 
@@ -1062,19 +1077,18 @@ boolean ATECCX08A::signTempKey(uint16_t slot)
 {
   sendCommand(COMMAND_OPCODE_SIGN, SIGN_MODE_TEMPKEY, slot);
 
-  delay(60); // time for IC to process command and exectute
+  delay(70); // time for IC to process command and execute
 
   // Now let's read back from the IC.
   
-  if (receiveResponseData(64 + 2 + 1) == false) 
+  if (receiveResponseData(64 + 2 + 1, true) == false) 
 	{
-		setStatus(STATUS_EXECUTION_ERROR);
   	return false; // signature (64), plus crc (2), plus count (1)
 	}
   idleMode();
   boolean checkCountResult = checkCount();
   boolean checkCrcResult = checkCrc();
-  
+	
   // update signature[] array and print it to serial terminal nicely formatted for easy copy/pasting between sketches
   if (checkCountResult && checkCrcResult) // check that it was a good message
   {  
@@ -1261,18 +1275,26 @@ boolean ATECCX08A::sendCommand(uint8_t command_opcode, uint8_t param1, uint16_t 
 }
 
 
-
-boolean ATECCX08A::sha256(const uint8_t *plain, size_t len, uint8_t *hash)
+boolean ATECCX08A::beginSHA256()
 {
+	boolean result;
+	
+	result = sendCommand(COMMAND_OPCODE_SHA, SHA_START, 0, NULL, 0, false);
+	return result;
+}
+
+
+boolean ATECCX08A::updateSHA256(const uint8_t *plainText, int length)
+{
+	boolean result;
 	int i;
-	size_t chunks = len / SHA_BLOCK_SIZE + !!(len % SHA_BLOCK_SIZE);
-  if ((len % SHA_BLOCK_SIZE) == 0) chunks += 1; // END command can only accept up to 63 bytes, so we must add a "blank chunk" for the end command
+	size_t chunks = length / SHA_BLOCK_SIZE + !!(length % SHA_BLOCK_SIZE);
+	
+  if ((length % SHA_BLOCK_SIZE) == 0) 
+		chunks += 1; // END command can only accept up to 63 bytes, so we must add a "blank chunk" for the end command
 
   // Serial.print("chunks:");
   // Serial.println(chunks);
-
-	if (!sendCommand(COMMAND_OPCODE_SHA, SHA_START, 0, NULL, 0, true))
-		return false;
 
 	/* Divide into blocks of 64 bytes per chunk */
 	for (i = 0; i < chunks; ++i)
@@ -1281,68 +1303,74 @@ boolean ATECCX08A::sha256(const uint8_t *plain, size_t len, uint8_t *hash)
 		uint8_t chunk[SHA_BLOCK_SIZE];
 
 		delay(9);
-
 		if (!receiveResponseData(RESPONSE_COUNT_SIZE + RESPONSE_SIGNAL_SIZE + CRC_SIZE))
 		{
 			setStatus(STATUS_EXECUTION_ERROR);
 			return false;
 		}
-
 		idleMode();
-
 		if (!checkCount() || !checkCrc())
 		{
 			setStatus(STATUS_EXECUTION_ERROR);
 			return false;
 		}
-
 		// If we hear a "0x00", that means it had a successful load
 		if (inputBuffer[RESPONSE_SIGNAL_INDEX] != ATRCC508A_SUCCESSFUL_SHA)
 		{
 			setStatus(inputBuffer[RESPONSE_SIGNAL_INDEX]);
 			return false;
 		}
-
 		if (i + 1 == chunks) // if we're on the last chunk, there will be a remainder or 0 (and 0 is okay for an end command)
-			data_size = len % SHA_BLOCK_SIZE;
-
-    // Serial.print("chunk:");
-    // Serial.println(i);
-    // Serial.print("data_size:");
-    // Serial.println(data_size);
-    // Serial.print("update vs end:");
-    // Serial.println((i + 1 != chunks) ? SHA_UPDATE : SHA_END);
+			data_size = length % SHA_BLOCK_SIZE;
 
 		/* Send next */
-		if (!sendCommand(COMMAND_OPCODE_SHA, (i + 1 != chunks) ? SHA_UPDATE : SHA_END, data_size, plain + i * SHA_BLOCK_SIZE, data_size, true))
+		if (!sendCommand(COMMAND_OPCODE_SHA, (i + 1 != chunks) ? SHA_UPDATE : SHA_END, data_size, plainText + i * SHA_BLOCK_SIZE, data_size, false))
 			return false;
 	}
+	return true;
+}
 
+
+boolean ATECCX08A::endSHA256(uint8_t *hash, int size)
+{
 	/* Read digest */
 	delay(9);
-
 	if (!receiveResponseData(RESPONSE_COUNT_SIZE + RESPONSE_SHA_SIZE + CRC_SIZE))
 	{
-		setStatus(STATUS_EXECUTION_ERROR);
 		return false;
 	}
 
 	idleMode();
-
 	if (!checkCount() || !checkCrc())
 	{
-		setStatus(STATUS_EXECUTION_ERROR);
 		return false;
 	}
 
 	/* Copy digest */
-	for (i = 0; i < SHA256_SIZE; ++i)
+	for (int i = 0; i < SHA256_SIZE; ++i)
 	{
 		hash[i] = inputBuffer[RESPONSE_SHA_INDEX + i];
 	}
 
 	setStatus(STATUS_SUCCESS);
 	return true;
+}
+
+boolean ATECCX08A::sha256(const uint8_t *plain, size_t len, uint8_t *hash)
+{
+	boolean result;
+	
+	result = beginSHA256();
+	if (result == false)
+		return false;
+
+  result = updateSHA256(plain, len);
+	if (result == false)
+		return result;
+		
+	/* Read digest */
+	result = endSHA256(hash, SHA256_SIZE);
+	return result;
 }
 
 
@@ -1426,13 +1454,6 @@ boolean ATECCX08A::encryptDecryptBlock(const uint8_t *input, int inputSize, uint
 	}
 }
 
-
-
-
-byte * ATECCX08A::getPublicKey()
-{
-	return publicKey64Bytes;
-}
 
 
 boolean ATECCX08A::getSlotLockStatus(uint16_t slot)
