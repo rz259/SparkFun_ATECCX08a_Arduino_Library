@@ -208,14 +208,15 @@ class ATECCX08A {
 		
 		boolean wakeUp();
 		void idleMode();
+		
 		boolean getInfo();
 		boolean writeConfigSparkFun();
+		
+		// locking methods
 		boolean lockConfiguration(); // note, this PERMINANTLY disables changes to config zone - including changing the I2C address!
 		boolean lockDataAndOTP();
 		boolean lockDataSlot0();
 		boolean lockDataSlot(uint16_t slot);
-		
-		
 		boolean lock(uint8_t zone);
 		
 		
@@ -228,10 +229,9 @@ class ATECCX08A {
 		long random(long min, long max);
 		
 	// SHA256
-		boolean sha256(uint8_t * data, size_t len, uint8_t * hash);
+		boolean sha256(const uint8_t *data, size_t len, uint8_t *hash);
 		
-		uint8_t crc[2] = {0, 0};
-		void atca_calculate_crc(uint8_t length, uint8_t *data);	
+		void atca_calculate_crc(uint8_t length, const uint8_t *data);	
 		
 		// Key functions
 		boolean createNewKeyPair(uint16_t slot = 0x0000);
@@ -239,17 +239,17 @@ class ATECCX08A {
 		byte *getPublicKey();
 		
 		
-		boolean createSignature(uint8_t *data, uint16_t slot = 0x0000); 
-		boolean loadTempKey(uint8_t *data);  // load 32 bytes of data into tempKey (a temporary memory spot in the IC)
+		boolean createSignature(const uint8_t *data, uint16_t slot = 0x0000); 
+		boolean loadTempKey(const uint8_t *data);  // load 32 bytes of data into tempKey (a temporary memory spot in the IC)
 		boolean signTempKey(uint16_t slot = 0x0000); // create signature using contents of TempKey and PRIVATE KEY in slot
-		boolean verifySignature(uint8_t *message, uint8_t *signature, uint8_t *publicKey); // external ECC publicKey only
+		boolean verifySignature(const uint8_t *message, const uint8_t *signature, const uint8_t *publicKey); // external ECC publicKey only
 
 		boolean read(uint8_t zone, uint16_t address, uint8_t length, boolean debug = false);
 		boolean read(uint8_t zone, uint16_t address, uint8_t *response, uint8_t length, boolean debug = false);
 		boolean write(uint8_t zone, uint16_t address, const uint8_t *data, uint8_t length_of_data);
 		boolean writeSlot(int slot, const uint8_t *data, int length);
     boolean readSlot(int slot, uint8_t *data, int length);
-    int addressForSlotOffset(int slot, int offset);
+    int     addressForSlotOffset(int slot, int offset);
 		
 
 
@@ -264,15 +264,12 @@ class ATECCX08A {
 	  boolean getSerialNumber(uint8_t *serialNo, int length);
 	  boolean getRevisionNumber(uint8_t *revisionNo, int length);
     boolean getSignature(uint8_t *signature, int length);
-		
 		int getStatus();
 		boolean isAESEnabled();
-    // boolean encryptDecrypt(uint8_t *clearText, int sizeClearText, uint8_t *encrypted, int sizeEncrypted, uint8_t slot, uint8_t keyIndex, uint8_t mode, boolean debug = false);
-		boolean encryptDecryptBlock(uint8_t *input, int inputSize, uint8_t *output, int outputSize, uint8_t slot, uint8_t keyIndex, uint8_t mode, boolean debug=false);
+		boolean encryptDecryptBlock(const uint8_t *input, int inputSize, uint8_t *output, int outputSize, uint8_t slot, uint8_t keyIndex, uint8_t mode, boolean debug=false);
 	
 	protected:
 		boolean sendCommand(uint8_t command_opcode, uint8_t param1, uint16_t param2, const uint8_t *data = NULL, size_t length_of_data = 0, boolean debug=false);
-				
 	  void setStatus(int status);
 	
   private:
@@ -281,6 +278,7 @@ class ATECCX08A {
 		uint8_t _i2caddr;
 		Stream *_debugSerial; //The generic connection to user's chosen serial hardware
 		
+		uint8_t crc[2] = {0, 0};
   	byte configZone[128]; // used to store configuration zone bytes read from device EEPROM
   	byte inputBuffer[BUFFER_SIZE]; // used to store messages received from the IC as they come in
     byte status;
@@ -294,7 +292,7 @@ class ATECCX08A {
 	  uint8_t signature[SIGNATURE_SIZE];
 
 	  void printHexValue(byte value);
-		void printHexValue(byte value[], int length, char *separator);
+		void printHexValue(const byte *value, int length, const char *separator);
 	
 };
 

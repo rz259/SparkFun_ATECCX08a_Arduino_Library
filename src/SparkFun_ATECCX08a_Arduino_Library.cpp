@@ -586,15 +586,17 @@ boolean ATECCX08A::checkCrc(boolean debug)
     \param[in] data pointer to data for which CRC should be calculated
 */
 
-void ATECCX08A::atca_calculate_crc(uint8_t length, uint8_t *data)
+void ATECCX08A::atca_calculate_crc(uint8_t length, const uint8_t *data)
 {
   uint8_t counter;
   uint16_t crc_register = 0;
   uint16_t polynom = 0x8005;
   uint8_t shift_register;
   uint8_t data_bit, crc_bit;
-  for (counter = 0; counter < length; counter++) {
-    for (shift_register = 0x01; shift_register > 0x00; shift_register <<= 1) {
+  for (counter = 0; counter < length; counter++) 
+	{
+    for (shift_register = 0x01; shift_register > 0x00; shift_register <<= 1) 
+		{
       data_bit = (data[counter] & shift_register) ? 1 : 0;
       crc_bit = crc_register >> 15;
       crc_register <<= 1;
@@ -989,7 +991,7 @@ boolean ATECCX08A::writeKey(uint16_t slot, uint8_t *data, uint8_t length)
 	receives the signature and copies it to signature[].
 */
 
-boolean ATECCX08A::createSignature(uint8_t *data, uint16_t slot)
+boolean ATECCX08A::createSignature(const uint8_t *data, uint16_t slot)
 {
   boolean loadTempKeyResult = loadTempKey(data);
   boolean signTempKeyResult = signTempKey(slot);
@@ -1013,7 +1015,7 @@ boolean ATECCX08A::createSignature(uint8_t *data, uint16_t slot)
     when it requests data, and this will allow us to create a unique data + signature for every communication.
 */
 
-boolean ATECCX08A::loadTempKey(uint8_t *data)
+boolean ATECCX08A::loadTempKey(const uint8_t *data)
 {
   sendCommand(COMMAND_OPCODE_NONCE, NONCE_MODE_PASSTHROUGH, 0x0000, data, 32);
   
@@ -1115,7 +1117,7 @@ boolean ATECCX08A::signTempKey(uint16_t slot)
 	Note, it acutally uses loadTempKey, then uses the verify command in "external public key" mode.
 */
 
-boolean ATECCX08A::verifySignature(uint8_t *message, uint8_t *signature, uint8_t *publicKey)
+boolean ATECCX08A::verifySignature(const uint8_t *message, const uint8_t *signature, const uint8_t *publicKey)
 {
   // first, let's load the message into TempKey on the device, this uses NONCE command in passthrough mode.
   boolean loadTempKeyResult = loadTempKey(message);
@@ -1260,7 +1262,7 @@ boolean ATECCX08A::sendCommand(uint8_t command_opcode, uint8_t param1, uint16_t 
 
 
 
-boolean ATECCX08A::sha256(uint8_t * plain, size_t len, uint8_t * hash)
+boolean ATECCX08A::sha256(const uint8_t *plain, size_t len, uint8_t *hash)
 {
 	int i;
 	size_t chunks = len / SHA_BLOCK_SIZE + !!(len % SHA_BLOCK_SIZE);
@@ -1344,7 +1346,7 @@ boolean ATECCX08A::sha256(uint8_t * plain, size_t len, uint8_t * hash)
 }
 
 
-boolean ATECCX08A::encryptDecryptBlock(uint8_t *input, int inputSize, uint8_t *output, int outputSize, uint8_t slot, uint8_t keyIndex, uint8_t mode, boolean debug)
+boolean ATECCX08A::encryptDecryptBlock(const uint8_t *input, int inputSize, uint8_t *output, int outputSize, uint8_t slot, uint8_t keyIndex, uint8_t mode, boolean debug)
 {
 	int size;
 
@@ -1541,7 +1543,7 @@ void ATECCX08A::printHexValue(byte value)
 	_debugSerial->print(value, HEX);
 }
 
-void ATECCX08A::printHexValue(byte value[], int length, char *separator)
+void ATECCX08A::printHexValue(const byte *value, int length, const char *separator)
 {
 	for (int index = 0; index < length; index++)
 	{

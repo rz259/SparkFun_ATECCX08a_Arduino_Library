@@ -11,7 +11,7 @@ ATECCAES::ATECCAES(ATECCX08A *atecc, PaddingType padding, AESMode mode, byte *iv
 	this->iv      = iv;
 }
 
-boolean ATECCAES::encrypt(uint8_t *plainText, int sizePlainText, uint8_t *encrypted, int &sizeEncrypted, uint8_t slot, uint8_t keyIndex, boolean debug)
+boolean ATECCAES::encrypt(const uint8_t *plainText, int sizePlainText, uint8_t *encrypted, int &sizeEncrypted, uint8_t slot, uint8_t keyIndex, boolean debug)
 {
 	boolean result;
 
@@ -29,7 +29,7 @@ boolean ATECCAES::encrypt(uint8_t *plainText, int sizePlainText, uint8_t *encryp
 	
 }
 
-boolean ATECCAES::encryptECB(uint8_t *plainText, int sizePlainText, uint8_t *encrypted, int &sizeEncrypted, uint8_t slot, uint8_t keyIndex, boolean debug)
+boolean ATECCAES::encryptECB(const uint8_t *plainText, int sizePlainText, uint8_t *encrypted, int &sizeEncrypted, uint8_t slot, uint8_t keyIndex, boolean debug)
 {
 	boolean result;
 	int     blocks, offset, totalSize, bytesEncrypted = 0;
@@ -60,7 +60,7 @@ boolean ATECCAES::encryptECB(uint8_t *plainText, int sizePlainText, uint8_t *enc
 	return true;
 }
 
-boolean ATECCAES::encryptCBC(uint8_t *plainText, int sizePlainText, uint8_t *encrypted, int &sizeEncrypted, uint8_t slot, uint8_t keyIndex, boolean debug)
+boolean ATECCAES::encryptCBC(const uint8_t *plainText, int sizePlainText, uint8_t *encrypted, int &sizeEncrypted, uint8_t slot, uint8_t keyIndex, boolean debug)
 {
 	boolean result;
 	int     blocks, offset, totalSize, bytesEncrypted = 0;
@@ -98,7 +98,7 @@ boolean ATECCAES::encryptCBC(uint8_t *plainText, int sizePlainText, uint8_t *enc
 }
 
 
-boolean ATECCAES::decryptECB(uint8_t *encrypted, int sizeEncrypted, uint8_t *decrypted, int &sizeDecrypted, uint8_t slot, uint8_t keyIndex, boolean debug)
+boolean ATECCAES::decryptECB(const uint8_t *encrypted, int sizeEncrypted, uint8_t *decrypted, int &sizeDecrypted, uint8_t slot, uint8_t keyIndex, boolean debug)
 {
 	boolean result;
 	int     blocks, offset;
@@ -138,7 +138,7 @@ boolean ATECCAES::decryptECB(uint8_t *encrypted, int sizeEncrypted, uint8_t *dec
 	return true;
 }
 
-boolean ATECCAES::decryptCBC(uint8_t *encrypted, int sizeEncrypted, uint8_t *decrypted, int &sizeDecrypted, uint8_t slot, uint8_t keyIndex, boolean debug)
+boolean ATECCAES::decryptCBC(const uint8_t *encrypted, int sizeEncrypted, uint8_t *decrypted, int &sizeDecrypted, uint8_t slot, uint8_t keyIndex, boolean debug)
 {
 	boolean result;
 	int     blocks, offset;
@@ -182,7 +182,7 @@ boolean ATECCAES::decryptCBC(uint8_t *encrypted, int sizeEncrypted, uint8_t *dec
 	return true;
 }
 
-boolean ATECCAES::decrypt(uint8_t *encrypted, int sizeEncrypted, uint8_t *decrypted, int &sizeDecrypted, uint8_t slot, uint8_t keyIndex, boolean debug)
+boolean ATECCAES::decrypt(const uint8_t *encrypted, int sizeEncrypted, uint8_t *decrypted, int &sizeDecrypted, uint8_t slot, uint8_t keyIndex, boolean debug)
 {
 	switch(mode)
 	{
@@ -334,7 +334,7 @@ boolean ATECCAES::performChecksForDecryption(int sizeEncrypted, int sizeDecrypte
 }
 
 
-uint8_t * ATECCAES::initInputBuffer(uint8_t *plainText, int sizePlainText, int &totalSize)
+uint8_t * ATECCAES::initInputBuffer(const uint8_t *plainText, int sizePlainText, int &totalSize)
 {
 	uint8_t *inputBuffer;
 	
@@ -346,7 +346,7 @@ uint8_t * ATECCAES::initInputBuffer(uint8_t *plainText, int sizePlainText, int &
 }
 
 
-void  ATECCAES::xorBlock(uint8_t *data, uint8_t *block, int size)
+void  ATECCAES::xorBlock(uint8_t *data, const uint8_t *block, int size)
 {
 	for (int index = 0; index < size; index++)
 	{
