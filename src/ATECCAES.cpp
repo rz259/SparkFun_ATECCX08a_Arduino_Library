@@ -5,7 +5,7 @@
 
 ATECCAES::ATECCAES(const ATECCX08A *atecc, PaddingType padding)
 {
-	this->atecc = atecc;
+	this->atecc = (ATECCX08A *) atecc;
 	this->padding = padding;
 }
 
