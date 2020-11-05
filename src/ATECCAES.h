@@ -17,42 +17,60 @@ typedef enum PaddingType
   PKCS7Padding
 }	PaddingType;
 
-typedef enum AESMode
-{
-	ECB,
-	CBC
-} AESMode;
 
 class ATECCAES
 {
-
   public:
-	  ATECCAES(ATECCX08A *atecc, PaddingType padding, AESMode mode, byte *iv = NULL);
-		int         getStatus();
-    boolean encrypt(const uint8_t *plainText, int sizePlainText, uint8_t *encrypted, int &sizeEncrypted, uint8_t slot, uint8_t keyIndex, boolean debug = false);
-    boolean decrypt(const uint8_t *encrypted, int sizeEncrypted, uint8_t *decrypted, int &sizeDecrypted, uint8_t slot, uint8_t keyIndex, boolean debug = false);
-		
-	private:
-	  ATECCX08A *atecc;
-		PaddingType padding;
-		AESMode     mode;
-		byte        *iv;
-		int         status;
-		
-		boolean encryptECB(const uint8_t *plainText, int sizePlainText, uint8_t *encrypted, int &sizeEncrypted, uint8_t slot, uint8_t keyIndex, boolean debug = false);
-		boolean encryptCBC(const uint8_t *plainText, int sizePlainText, uint8_t *encrypted, int &sizeEncrypted, uint8_t slot, uint8_t keyIndex, boolean debug = false);
-    boolean decryptECB(const uint8_t *encrypted, int sizeEncrypted, uint8_t *decrypted, int &sizeDecrypted, uint8_t slot, uint8_t keyIndex, boolean debug = false);
-    boolean decryptCBC(const uint8_t *encrypted, int sizeEncrypted, uint8_t *decrypted, int &sizeDecrypted, uint8_t slot, uint8_t keyIndex, boolean debug = false);
-		PaddingType getPadding();
+	  ATECCAES(const ATECCX08A *atecc, PaddingType padding);
+		int     getStatus();
+    virtual boolean encrypt(const uint8_t *plainText, int sizePlainText, uint8_t *encrypted, int &sizeEncrypted, uint8_t slot, uint8_t keyIndex, boolean debug = false) = 0;
+    virtual boolean decrypt(const uint8_t *encrypted, int sizeEncrypted, uint8_t *decrypted, int &sizeDecrypted, uint8_t slot, uint8_t keyIndex, boolean debug = false) = 0;
+
+  protected:
 	  void setStatus(int status);
-		AESMode getMode();
-	  void printHexValue(uint8_t value);
-		void printHexValue(const uint8_t *value, int length, const char *separator);
-		int  calcSizeNeeded(int length);
 		void appendPadding(uint8_t *data, int sizePlainText, int totalSize);
 		boolean removePadding(uint8_t *decryptBuffer, int &bytesDecrypted);
 		boolean performChecksForEncryption(int sizePlainText, int sizeEncrypted);
     boolean performChecksForDecryption(int sizeEncrypted, int sizeDecrypted);
 		uint8_t *initInputBuffer(const uint8_t *plainText, int sizePlainText, int &totalSize);
-		void    xorBlock(uint8_t *data, const uint8_t *block, int size);
+		ATECCX08A *getCryptoAdapter();
+
+	
+	private:
+	  ATECCX08A   *atecc;
+		PaddingType padding;
+		int         status;
+		
+		PaddingType getPadding();
+	  void printHexValue(uint8_t value);
+		void printHexValue(const uint8_t *value, int length, const char *separator);
+		int  calcSizeNeeded(int length);
 };
+
+class ATECCAES_ECB : public ATECCAES
+{
+	public:
+	  ATECCAES_ECB(ATECCX08A *atecc, PaddingType padding);
+    virtual boolean encrypt(const uint8_t *plainText, int sizePlainText, uint8_t *encrypted, int &sizeEncrypted, uint8_t slot, uint8_t keyIndex, boolean debug = false);
+    virtual boolean decrypt(const uint8_t *encrypted, int sizeEncrypted, uint8_t *decrypted, int &sizeDecrypted, uint8_t slot, uint8_t keyIndex, boolean debug = false);
+		
+  private: 
+	
+};
+
+class ATECCAES_CBC : public ATECCAES
+{
+	public:
+	  ATECCAES_CBC(ATECCX08A *atecc, PaddingType padding, uint8_t *iv);
+    virtual boolean encrypt(const uint8_t *plainText, int sizePlainText, uint8_t *encrypted, int &sizeEncrypted, uint8_t slot, uint8_t keyIndex, boolean debug = false);
+    virtual boolean decrypt(const uint8_t *encrypted, int sizeEncrypted, uint8_t *decrypted, int &sizeDecrypted, uint8_t slot, uint8_t keyIndex, boolean debug = false);
+		void setIV(const uint8_t *iv);
+		
+  private: 
+	  uint8_t iv[AES_BLOCKSIZE];
+		
+		void    xorBlock(uint8_t *data, const uint8_t *block, int size);
+	
+};
+
+
