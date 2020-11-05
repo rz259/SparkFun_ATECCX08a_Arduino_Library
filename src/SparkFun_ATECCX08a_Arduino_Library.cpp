@@ -1003,10 +1003,10 @@ boolean ATECCX08A::writeKey(uint16_t slot, uint8_t *data, uint8_t length)
 	receives the signature and copies it to signature[].
 */
 
-boolean ATECCX08A::createSignature(const uint8_t *data, uint16_t slot)
+boolean ATECCX08A::createSignature(uint8_t *signature, int size, const uint8_t *data, uint16_t slot)
 {
   boolean loadTempKeyResult = loadTempKey(data);
-  boolean signTempKeyResult = signTempKey(slot);
+  boolean signTempKeyResult = signTempKey(signature, size, slot);
 	
 	Serial.println("createSignature for slot : " + String(slot));
 	Serial.println("loadTempKeyResult: " + String(loadTempKeyResult) + ", signTempKeyResult: " + String(signTempKeyResult));
@@ -1073,7 +1073,7 @@ boolean ATECCX08A::loadTempKey(const uint8_t *data)
 	The response from this command (the signature) is stored in global varaible signature[].
 */
 
-boolean ATECCX08A::signTempKey(uint16_t slot)
+boolean ATECCX08A::signTempKey(uint8_t *signature, int size, uint16_t slot)
 {
   sendCommand(COMMAND_OPCODE_SIGN, SIGN_MODE_TEMPKEY, slot);
 
@@ -1533,17 +1533,6 @@ boolean ATECCX08A::getRevisionNumber(uint8_t *revisionNo, int length)
 	}
 }
 
-
-boolean ATECCX08A::getSignature(uint8_t *signature, int length)
-{
-	if (length < SIGNATURE_SIZE)
-		return false;
-	else
-	{
-		memcpy(signature, this->signature, SIGNATURE_SIZE);
-		return true;
-	}
-}
 
 int ATECCX08A::getStatus()
 {
