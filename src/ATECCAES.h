@@ -35,16 +35,18 @@ class ATECCAES
 		uint8_t *initInputBuffer(const uint8_t *plainText, int sizePlainText, int &totalSize);
 		ATECCX08A *getCryptoAdapter();
 
+  protected:
+		PaddingType getPadding();
+	  void printHexValue(uint8_t value);
+		void printHexValue(const uint8_t *value, int length, const char *separator);
+		int  calcSizeNeeded(int length);
+
 	
 	private:
 	  ATECCX08A   *atecc;
 		PaddingType padding;
 		int         status;
 		
-		PaddingType getPadding();
-	  void printHexValue(uint8_t value);
-		void printHexValue(const uint8_t *value, int length, const char *separator);
-		int  calcSizeNeeded(int length);
 };
 
 class ATECCAES_ECB : public ATECCAES
