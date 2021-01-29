@@ -220,7 +220,6 @@ class ATECCX08A {
 		// locking methods
 		boolean lockConfiguration(); // note, this PERMINANTLY disables changes to config zone - including changing the I2C address!
 		boolean lockDataAndOTP();
-		boolean lockDataSlot0();
 		boolean lockDataSlot(uint16_t slot);
 		boolean lock(uint8_t zone);
 		
@@ -240,33 +239,34 @@ class ATECCX08A {
 		
 		// Key functions
 		boolean createNewKeyPair(uint8_t *publicKey, int size, uint16_t slot = 0x0000);
-		boolean generatePublicKey(uint8_t *publicKey, int size, uint16_t slot = 0x0000, boolean debug = true);
-		boolean createSignature(uint8_t *signature, int size, const uint8_t *data, uint16_t slot = 0x0000); 
+		boolean generatePublicKey(uint8_t *publicKey, int size, uint16_t slot = 0x0000, boolean debug = false);
+		boolean createSignature(uint8_t *signature, int size, const uint8_t *data, uint16_t slot, boolean debug = false); 
+    boolean signWithSHA256(uint8_t *signature, int sigSize, const uint8_t *data, int length, int slot, boolean debug = false);
+		
 		boolean loadTempKey(const uint8_t *data);  // load 32 bytes of data into tempKey (a temporary memory spot in the IC)
-		boolean signTempKey(uint8_t *signature, int size, uint16_t slot = 0x0000); // create signature using contents of TempKey and PRIVATE KEY in slot
+		boolean signTempKey(uint8_t *signature, int size, uint16_t slot = 0x0000, boolean debug = false); // create signature using contents of TempKey and PRIVATE KEY in slot
 		boolean verifySignature(const uint8_t *message, const uint8_t *signature, const uint8_t *publicKey); // external ECC publicKey only
 
 		boolean read(uint8_t zone, uint16_t address, uint8_t length, boolean debug = false);
 		boolean read(uint8_t zone, uint16_t address, uint8_t *response, uint8_t length, boolean debug = false);
-		boolean write(uint8_t zone, uint16_t address, const uint8_t *data, uint8_t length_of_data);
-		boolean writeSlot(int slot, const uint8_t *data, int length);
-    boolean readSlot(int slot, uint8_t *data, int length);
+		boolean write(uint8_t zone, uint16_t address, const uint8_t *data, uint8_t length_of_data, boolean debug = false);
+		boolean writeSlot(const uint8_t *data, int length, int slot, boolean debug = false);
+    boolean readSlot(uint8_t *data, int length, int slot, boolean debug = false);
 		boolean encryptDecryptBlock(const uint8_t *input, int inputSize, uint8_t *output, int outputSize, uint8_t slot, uint8_t keyIndex, uint8_t mode, boolean debug=false);
     int     addressForSlotOffset(int slot, int offset);
 		
-
-
-		boolean readConfigZone(boolean debug = true);
+		boolean readConfigZone(boolean debug = false);
 		byte    *getConfigZone();
 
 		// get lock states	
 		boolean getConfigLockStatus();
 		boolean getDataOTPLockStatus();
 		boolean getSlotLockStatus(uint16_t slot);
+		boolean isSlotLocked(uint16_t slot);
 		
 	  boolean getSerialNumber(uint8_t *serialNo, int length);
 	  boolean getRevisionNumber(uint8_t *revisionNo, int length);
-		int getStatus();
+		int     getStatus();
 		boolean isAESEnabled();
 	
 	protected:
@@ -284,7 +284,6 @@ class ATECCX08A {
     byte status;
   	boolean configLockStatus; // pulled from configZone[87], then set according to status (0x55=UNlocked, 0x00=Locked)
 	  boolean dataOTPLockStatus; // pulled from configZone[86], then set according to status (0x55=UNlocked, 0x00=Locked)
-	  boolean slot0LockStatus; // pulled from configZone[88], then set according to slot (bit 0) status
 		uint8_t countGlobal = 0; // used to add up all the bytes on a long message. Important to reset before each new receiveMessageData();
   	uint8_t revisionNumber[REVISION_NUMBER_SIZE]; // used to store the complete revision number, pulled from configZone[4-7]
 	  uint8_t serialNumber[SERIAL_NUMBER_SIZE]; // used to store the complete Serial number, pulled from configZone[0-3] and configZone[8-12]		

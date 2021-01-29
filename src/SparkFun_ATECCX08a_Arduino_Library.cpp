@@ -38,14 +38,10 @@
 
 boolean ATECCX08A::begin(uint8_t i2caddr, TwoWire &wirePort, Stream &serialPort)
 {
-  //Bring in the user's choices
-  _i2cPort = &wirePort; //Grab which port the user wants us to use
-  
-  _debugSerial = &serialPort; //Grab which port the user wants us to use
-
+  _i2cPort = &wirePort;        //Grab which port the user wants us to use
+  _debugSerial = &serialPort;  //Grab which port the user wants us to use
   _i2caddr = i2caddr;
-
-  return ( wakeUp() ); // see if the IC wakes up properly, return responce.
+  return ( wakeUp() );        // see if the IC wakes up properly, return response.
 }
 
 /** \brief 
@@ -125,10 +121,13 @@ boolean ATECCX08A::getInfo()
   
     // Now let's read back from the IC and see if it reports back good things.
   countGlobal = 0; 
-  if (receiveResponseData(7, true) == false) return false;
+  if (receiveResponseData(7, false) == false) 
+		return false;
   idleMode();
-  if (checkCount() == false) return false;
-  if (checkCrc() == false) return false;
+  if (checkCount() == false) 
+		return false;
+  if (checkCrc() == false) 
+		return false;
   if (inputBuffer[3] == 0x50) 
 	{
 		
@@ -196,11 +195,13 @@ boolean ATECCX08A::readConfigZone(boolean debug)
   
   if (configZone[86] == 0x00) dataOTPLockStatus = true;
   else dataOTPLockStatus = false;
-  
+
+/*  
   if ( (configZone[88] & (1<<0) ) == true) slot0LockStatus = false; // LSB is slot 0. if bit set = UN-locked.
   else slot0LockStatus = true;
+*/	
   
-  if (debug)
+  if (debug == true)
   {
     _debugSerial->println("configZone: ");
     for (int i = 0; i < sizeof(configZone) ; i++)
@@ -241,10 +242,6 @@ boolean ATECCX08A::lockDataAndOTP()
 	and listens for success response (0x00).
 */
 
-boolean ATECCX08A::lockDataSlot0()
-{
-  return lock(LOCK_MODE_SLOT0);
-}
 
 boolean ATECCX08A::lockDataSlot(uint16_t slot)
 {
@@ -274,13 +271,18 @@ boolean ATECCX08A::lock(uint8_t zone)
   
   // Now let's read back from the IC and see if it reports back good things.
   countGlobal = 0; 
-  if (receiveResponseData(4, true) == false) return false;
+  if (receiveResponseData(4, false) == false) 
+		return false;
   idleMode();
-  if (checkCount() == false) return false;
-  if (checkCrc() == false) return false;
+  if (checkCount() == false) 
+		return false;
+  if (checkCrc() == false) 
+		return false;
 	setStatus(inputBuffer[1]);
-  if (inputBuffer[1] == 0x00) return true;   // If we hear a "0x00", that means it had a successful lock
-  else return false;
+  if (inputBuffer[1] == 0x00) 
+		return true;   // If we hear a "0x00", that means it had a successful lock
+  else 
+		return false;
 }
 
 /** \brief
@@ -331,7 +333,7 @@ boolean ATECCX08A::generateRandomBytes(uint8_t *randomValue, int length, boolean
     randomValue[i] = inputBuffer[i + 1];
   }
 
-  if (debug)
+  if (debug == true)
   {
     _debugSerial->print("randomValue: ");
     for (int i = 0; i < length; i++)
@@ -492,7 +494,7 @@ boolean ATECCX08A::receiveResponseData(uint8_t length, boolean debug)
 		 */
 	}
 
-	if (debug)
+	if (debug == true)
 	{
 		_debugSerial->println("countGlobal    : " + String(countGlobal));
 		_debugSerial->print("inputBuffer: ");
@@ -527,7 +529,7 @@ boolean ATECCX08A::receiveResponseData(uint8_t length, boolean debug)
 
 boolean ATECCX08A::checkCount(boolean debug)
 {
-  if (debug)
+  if (debug == true)
   {
     _debugSerial->print("countGlobal: 0x");
 	  _debugSerial->println(countGlobal, HEX);
@@ -861,7 +863,7 @@ boolean ATECCX08A::read(uint8_t zone, uint16_t address, uint8_t length, boolean 
 	For more info on zone and address encoding, see datasheet pg 58.
 */
 
-boolean ATECCX08A::write(uint8_t zone, uint16_t address, const uint8_t *data, uint8_t length_of_data)
+boolean ATECCX08A::write(uint8_t zone, uint16_t address, const uint8_t *data, uint8_t length_of_data, boolean debug)
 {
   // adjust zone as needed for whether it's 4 or 32 bytes length write
   // bit 7 of param1 needs to be set correctly 
@@ -886,18 +888,18 @@ boolean ATECCX08A::write(uint8_t zone, uint16_t address, const uint8_t *data, ui
   
   // Now let's read back from the IC and see if it reports back good things.
   countGlobal = 0; 
-  if (receiveResponseData(4) == false) 
+  if (receiveResponseData(4, debug) == false) 
 	{
 		setStatus(STATUS_EXECUTION_ERROR);
 		return false;
 	}
   idleMode();
-  if (checkCount() == false)
+  if (checkCount(debug) == false)
   {		
 		setStatus(STATUS_EXECUTION_ERROR);
 		return false;
 	}
-  if (checkCrc() == false)
+  if (checkCrc(debug) == false)
 	{		
 		setStatus(STATUS_CRC_ERROR);
 		return false;
@@ -909,20 +911,21 @@ boolean ATECCX08A::write(uint8_t zone, uint16_t address, const uint8_t *data, ui
 		return false;
 }
 
+// TODO: Documentation
 
-boolean ATECCX08A::readSlot(int slot, uint8_t *data, int length)
+
+boolean ATECCX08A::readSlot(uint8_t *data, int length, int slot, boolean debug)
 {
+  int chunkSize = 32;
+
   if (slot < 0 || slot > 15) 
 	{
     return false;
   }
-
   if (length % 4 != 0) 
 	{
     return false;
   }
-
-  int chunkSize = 32;
 
   for (int i = 0; i < length; i += chunkSize) 
 	{
@@ -931,28 +934,28 @@ boolean ATECCX08A::readSlot(int slot, uint8_t *data, int length)
       chunkSize = 4;
     }
 
-    if (!read(ZONE_DATA, addressForSlotOffset(slot, i), &data[i], chunkSize)) 
+    if (!read(ZONE_DATA, addressForSlotOffset(slot, i), &data[i], chunkSize, debug)) 
 		{
       return false;
     }
   }
-
   return true;
 }
 
-boolean ATECCX08A::writeSlot(int slot, const uint8_t *data, int length)
+// TODO: Documentation
+
+boolean ATECCX08A::writeSlot(const uint8_t *data, int length, int slot, boolean debug)
 {
+  int chunkSize = 32;
+	
   if (slot < 0 || slot > 15) 
 	{
     return false;
   }
-
   if (length % 4 != 0) 
 	{
     return false;
   }
-
-  int chunkSize = 32;
 
   for (int i = 0; i < length; i += chunkSize) 
 	{
@@ -961,14 +964,15 @@ boolean ATECCX08A::writeSlot(int slot, const uint8_t *data, int length)
       chunkSize = 4;
     }
 
-    if (!write(ZONE_DATA, addressForSlotOffset(slot, i), &data[i], chunkSize)) 
+    if (!write(ZONE_DATA, addressForSlotOffset(slot, i), &data[i], chunkSize, debug)) 
 		{
       return false;
     }
   }
-
   return true;
 }
+
+// TODO: Documentation
 
 int ATECCX08A::addressForSlotOffset(int slot, int offset)
 {
@@ -979,37 +983,25 @@ int ATECCX08A::addressForSlotOffset(int slot, int offset)
 }
 
 
-/*
-boolean ATECCX08A::writeKey(uint16_t slot, uint8_t *data, uint8_t length)
-{
-	if (slot < 0 || slot > 15)
-		return false;
-	if (length != 32)
-		return false;
-	return write(ZONE_DATA, slot, data, length);
-}
-*/
-
 /** \brief
 
 	createSignature(uint8_t *data, uint16_t slot)
 
     Creates a 64-byte ECC signature on 32 bytes of data.
 	Defautes to use private key located in slot 0.
-	Your signature will be available at global variable signature[].
 	
 	Note, the IC actually needs you to store your data in a temporary memory location
 	called TempKey. This function first loads TempKey, and then signs TempKey. Then it 
 	receives the signature and copies it to signature[].
 */
 
-boolean ATECCX08A::createSignature(uint8_t *signature, int size, const uint8_t *data, uint16_t slot)
+boolean ATECCX08A::createSignature(uint8_t *signature, int size, const uint8_t *data, uint16_t slot, boolean debug)
 {
   boolean loadTempKeyResult = loadTempKey(data);
   boolean signTempKeyResult = signTempKey(signature, size, slot);
 	
-	Serial.println("createSignature for slot : " + String(slot));
-	Serial.println("loadTempKeyResult: " + String(loadTempKeyResult) + ", signTempKeyResult: " + String(signTempKeyResult));
+	// Serial.println("createSignature for slot : " + String(slot));
+	// Serial.println("loadTempKeyResult: " + String(loadTempKeyResult) + ", signTempKeyResult: " + String(signTempKeyResult));
   if (loadTempKeyResult && signTempKeyResult) 
 		return true;
   else 
@@ -1067,13 +1059,13 @@ boolean ATECCX08A::loadTempKey(const uint8_t *data)
 
 	signTempKey(uint16_t slot)
 
-	Create a 64 byte ECC signature for the contents of TempKey using the private key in Slot.
+	Create a 64 byte ECC signature for the contents of TempKey using the private key in slot.
 	Default slot is 0.
 	
 	The response from this command (the signature) is stored in global varaible signature[].
 */
 
-boolean ATECCX08A::signTempKey(uint8_t *signature, int size, uint16_t slot)
+boolean ATECCX08A::signTempKey(uint8_t *signature, int size, uint16_t slot, boolean debug)
 {
   sendCommand(COMMAND_OPCODE_SIGN, SIGN_MODE_TEMPKEY, slot);
 
@@ -1081,7 +1073,7 @@ boolean ATECCX08A::signTempKey(uint8_t *signature, int size, uint16_t slot)
 
   // Now let's read back from the IC.
   
-  if (receiveResponseData(64 + 2 + 1, true) == false) 
+  if (receiveResponseData(64 + 2 + 1, debug) == false) 
 	{
   	return false; // signature (64), plus crc (2), plus count (1)
 	}
@@ -1098,19 +1090,22 @@ boolean ATECCX08A::signTempKey(uint8_t *signature, int size, uint16_t slot)
       signature[i] = inputBuffer[i + 1];
     }
   
-	  _debugSerial->println();
-    _debugSerial->println("uint8_t signature[64] = {");
-    for (int i = 0; i < sizeof(signature) ; i++)
-    {
-	    _debugSerial->print("0x");
-	    if ((signature[i] >> 4) == 0) _debugSerial->print("0"); // print preceeding high nibble if it's zero
-        _debugSerial->print(signature[i], HEX);
-      if (i != 63) 
-				_debugSerial->print(", ");
-	    if ((63-i) % 16 == 0) 
-				_debugSerial->println();
-    }
-	  _debugSerial->println("};");
+	  if (debug == true)
+		{
+			_debugSerial->println();
+			_debugSerial->println("uint8_t signature[64] = {");
+			for (int i = 0; i < 64 ; i++)
+			{
+				_debugSerial->print("0x");
+				if ((signature[i] >> 4) == 0) _debugSerial->print("0"); // print preceeding high nibble if it's zero
+					_debugSerial->print(signature[i], HEX);
+				if (i != 63) 
+					_debugSerial->print(", ");
+				if ((63-i) % 16 == 0) 
+					_debugSerial->println();
+			}
+			_debugSerial->println("};");
+		}
 		setStatus(STATUS_SUCCESS);
 	  return true;
   }
@@ -1264,9 +1259,7 @@ boolean ATECCX08A::sendCommand(uint8_t command_opcode, uint8_t param1, uint16_t 
 	}
 
   memcpy(&total_transmission[total_transmission_length-2], &crc[0], 2);  // append crcs
-
   wakeUp();
-  
   _i2cPort->beginTransmission(_i2caddr);
   _i2cPort->write(total_transmission, total_transmission_length); 
   _i2cPort->endTransmission();
@@ -1489,6 +1482,39 @@ boolean ATECCX08A::getSlotLockStatus(uint16_t slot)
 	return result;
 }
 
+boolean ATECCX08A::isSlotLocked(uint16_t slot)
+{
+	byte configByte;
+	int  bitPosition;
+	bool result;
+	
+	if (slot > 16)
+	{
+		return false;
+	}
+	
+	if (slot < 8)
+	{
+	  configByte = configZone[CONFIG_ZONE_SLOTS_LOCK0];
+		bitPosition = slot;
+	}
+	else
+	{
+	  configByte = configZone[CONFIG_ZONE_SLOTS_LOCK1];
+		bitPosition = slot - 8;
+	}
+	
+	if ((configByte & (1 << bitPosition)) == 0)
+	{
+		result = true;
+	}
+	else
+	{
+		result = false;
+	}
+	return result;
+}
+
 
 boolean ATECCX08A::getConfigLockStatus()
 {
@@ -1563,3 +1589,31 @@ void ATECCX08A::printHexValue(const byte *value, int length, const char *separat
 	_debugSerial->println();
 }
 
+
+boolean ATECCX08A::signWithSHA256(uint8_t *signature, int sigSize, const uint8_t *data, int length, int slot, boolean debug)
+{
+  bool result;
+  uint8_t hashValue[SHA256_SIZE];
+	String s;
+  
+  result = sha256((uint8_t *) data, length, hashValue);
+  if (result == true)
+  {
+    /*
+		Serial.println("SHA-256 (sign)");
+    printHexValue(hashValue, sizeof(hashValue), " ");
+    Serial.println();
+		*/
+    result = createSignature(signature, sigSize, hashValue, slot);
+    /* 
+		Serial.println("Status createSignature : " + String(getStatus()));
+    if (result == true)
+    {
+      Serial.println("Signature (sign)");
+      printHexValue(signature, SIGNATURE_SIZE, " ");
+      Serial.println();
+    }
+		*/
+  }
+  return result;
+}
