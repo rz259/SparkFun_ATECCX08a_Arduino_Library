@@ -40,6 +40,8 @@ void ATECCAES::printHexValue(const uint8_t *value, int length, const char *separ
 	{
 		printHexValue(value[index]);
 	  Serial.print(String(separator));
+		if ((index + 1) % 16 == 0)
+		  Serial.println();
 	}
 	Serial.println();
 }
@@ -271,14 +273,18 @@ boolean ATECCAES_CBC::encrypt(const uint8_t *plainText, int sizePlainText, uint8
 		offset = index * AES_BLOCKSIZE;
 		xorBlock(&inputBuffer[offset], ivBlock, AES_BLOCKSIZE);
 	  result = getCryptoAdapter()->encryptDecryptBlock(&inputBuffer[offset], AES_BLOCKSIZE, &encrypted[offset], AES_BLOCKSIZE, slot, keyIndex, AES_ENCRYPT, debug);
-		
+		if (debug == true)
+		{
+		  printHexValue(encrypted, totalSize, " ");
+		  Serial.println();
+		}
 		if (result == false)
 		{
 			free(inputBuffer);
 			return result;
 		}
 		bytesEncrypted += AES_BLOCKSIZE;
-    memcpy(ivBlock, encrypted, AES_BLOCKSIZE);
+    memcpy(ivBlock, &encrypted[offset], AES_BLOCKSIZE);
   }
 	setStatus(ATECCAES_SUCCESS);
 	sizeEncrypted = bytesEncrypted;
@@ -332,11 +338,11 @@ boolean ATECCAES_CBC::decrypt(const uint8_t *encrypted, int sizeEncrypted, uint8
 	return true;
 }
 
-void  ATECCAES_CBC::xorBlock(uint8_t *data, const uint8_t *block, int size)
+void  ATECCAES_CBC::xorBlock(uint8_t *data, const uint8_t *ivBlock, int size)
 {
 	for (int index = 0; index < size; index++)
 	{
-		data[index] ^= block[index];
+		data[index] ^= ivBlock[index];
 	}
 }
 
