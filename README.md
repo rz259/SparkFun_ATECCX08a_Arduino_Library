@@ -29,6 +29,9 @@ I decided to implement these features in a new class to separate the additional 
 library gets bigger and bigger.
 
 
+And now the original readme....
+
+
 The SparkFun Cryptographic Co-processor Breakout ATECC508A (Qwiic) takes all the great features of the Microchip ATECC508A cryptographic authentication device and adds two Qwiic ports for plug and play functionality. The ATECC508A chip is capable of many cryptographic processes, including, but not limited to:
 
 * An asymmetric key/signature solution based upon Elliptic Curve Cryptography.
