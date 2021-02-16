@@ -25,7 +25,8 @@ A new class ATECCAES (ATECCAES.cpp and ATECAES.h) have been created to implement
 * encryption mode ECB (not recommended)
 * encryption mode CBC
 
-
+I decided to implement these features in a new class to separate the additional functionality from the SparkFun basis. I also wanted to avoid that the base 
+library gets bigger and bigger.
 
 
 The SparkFun Cryptographic Co-processor Breakout ATECC508A (Qwiic) takes all the great features of the Microchip ATECC508A cryptographic authentication device and adds two Qwiic ports for plug and play functionality. The ATECC508A chip is capable of many cryptographic processes, including, but not limited to:
