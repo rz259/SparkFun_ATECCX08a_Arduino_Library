@@ -1171,38 +1171,6 @@ boolean ATECCX08A::verifySignature(const uint8_t *message, const uint8_t *signat
 		return false;
 }
 
-/** \brief
-
-	writeConfigSparkFun()
-	
-	Writes the necessary configuration settings to the IC in order to work with the SparkFun Arduino Library examples.
-	For key slots 0 and 1, this enables ECC private key pairs,public key generation, and external signature verifications.
-	
-	Returns true if write commands were successful.
-*/
-
-boolean ATECCX08A::writeConfigSparkFun()
-{
-  // keep track of our write command results.
-  boolean result1;
-  boolean result2;
-  boolean result3;
-  boolean result4;
-
-  // set keytype on slots 0,1, 2 and 3 to 0x3300
-  // Lockable, ECC, PuInfo set (public key always allowed to be generated), contains a private Key
-  uint8_t data1[] = {0x33, 0x00, 0x33, 0x00}; // 0x3300 sets the keyconfig.keyType, see datasheet pg 20
-  result1 = write(ZONE_CONFIG, (96 / 4), data1, 4);  // slot 0 and slot 1
-  result2 = write(ZONE_CONFIG, (100 / 4), data1, 4); // slot 2 and slot 3
-	
-  // set slot config on slots 0, 1, 2 and 3 to 0x8320
-  // EXT signatures, INT signatures, IsSecret, Write config never
-  uint8_t data2[] = {0x83, 0x20, 0x83, 0x20}; // for slot config bit definitions see datasheet pg 20
-  result3 = write(ZONE_CONFIG, (20 / 4), data2, 4);  // slot 0 and slot 1
-  result4 = write(ZONE_CONFIG, (24 / 4), data2, 4);  // slot 2 and slot 3
-
-  return (result1 && result2 && result3 && result4);
-}
 
 /** \brief
 

@@ -215,7 +215,6 @@ class ATECCX08A {
 		void idleMode();
 		
 		boolean getInfo();
-		boolean writeConfigSparkFun();
 		
 		// locking methods
 		boolean lockConfiguration(); // note, this PERMINANTLY disables changes to config zone - including changing the I2C address!
