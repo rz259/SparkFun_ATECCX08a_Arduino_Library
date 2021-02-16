@@ -3,6 +3,31 @@ SparkFun ATECCX08A Arduino Library
 
 ![SparkFun Cryptographic Breakout](https://cdn.sparkfun.com/assets/parts/1/4/1/6/9/15573-SparkFun_Cryptographic_Co-Processor_Breakout_-_ATECC508A__Qwiic_-01.jpg)
 
+The library in this fork has been modified in several aspects
+
+* the API has been tidied up a little bit, especially regarding the debug flag which was not consistently used throughout the library
+* the method "writeConfigSparkFun" has been removed, since it should not really be in the library. The configuration should better be done outside the library
+* the API for sha256 has been broken up in three methods
+  - beginSHA256
+  - updateSHA256
+  - endSHA256
+  sha256() now calls these 3 methods to improve readability
+* a new method "signWithSHA256" has been introduced which first calculates the sha256-value of the data and then signs the hash-value  
+* a new method "readSlot" for reading a slot has been added
+* a new method "writeSlot" for writing a slot has been added
+* a new method "encryptDecryptBlock" for encrypting and decrypting a block of 16 bytes has been added
+
+Due to these changes the examples provided don't work any longer since there are breaking changes in the API.
+
+A new class ATECCAES (ATECCAES.cpp and ATECAES.h) have been created to implement AES encryption and decryption. This class prvides the following features:
+
+* encrypting and decryption message of arbitrary size with no padding or PKCS7Padding
+* encryption mode ECB (not recommended)
+* encryption mode CBC
+
+
+
+
 The SparkFun Cryptographic Co-processor Breakout ATECC508A (Qwiic) takes all the great features of the Microchip ATECC508A cryptographic authentication device and adds two Qwiic ports for plug and play functionality. The ATECC508A chip is capable of many cryptographic processes, including, but not limited to:
 
 * An asymmetric key/signature solution based upon Elliptic Curve Cryptography.
