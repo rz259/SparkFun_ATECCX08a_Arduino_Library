@@ -22,7 +22,6 @@
 */
 
 #include "SparkFun_ATECCX08a_Arduino_Library.h"
-#include "StringUtils.h"
 
 /** \brief 
 
