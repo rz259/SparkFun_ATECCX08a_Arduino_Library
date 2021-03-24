@@ -1593,27 +1593,13 @@ boolean ATECCX08A::verifyWithSHA256(const uint8_t *signature, int sigSize, const
 	String s;
 	uint8_t publicKey[PUBLIC_KEY_SIZE];
   
-  Serial.println("verifyWithSHA256 : ");
-  Serial.println("-------------------");
-
-  Serial.println("Signature : ");
-  Serial.println(StringUtils::hexValueToString(signature, sigSize, "", " "));
-	Serial.println("Signaturlänge : " + String(sigSize));
-	Serial.println("Data          : " + StringUtils::hexValueToString(data, length, "", " "));
-	Serial.println("Data-length   : " + String(length));
-  
-
   result = sha256((uint8_t *) data, length, hashValue);
   if (result == true)
   {
 		result = readSlot(publicKey, PUBLIC_KEY_SIZE, slot);
 		if (result == true)
 		{
-			Serial.println("Public Key : ");
-			Serial.println(StringUtils::hexValueToString(publicKey, PUBLIC_KEY_SIZE, "", " "));
-  		Serial.println("readSlot (verifyWithSHA256) ok");
 			result = verifySignature(hashValue, signature, publicKey);
-			Serial.println("Result verifySignature : " + String(result));
 		}
   }
   return result;
