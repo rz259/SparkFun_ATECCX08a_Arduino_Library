@@ -22,6 +22,7 @@
 */
 
 #include "SparkFun_ATECCX08a_Arduino_Library.h"
+#include "StringUtils.h"
 
 /** \brief 
 
@@ -109,8 +110,8 @@ void ATECCX08A::idleMode()
 	This function sends the INFO Command and listens for the correct version (0x50) within the response.
 	The Info command has a mode parameter, and in this function we are using the "Revision" mode (0x00)
 	At the time of data sheet creation the Info command will return 0x00 0x00 0x50 0x00. For
-	all versions of the ECC508A the 3rd byte will always be 0x50. The fourth byte will indicate the
-	silicon revision.
+	all versions of the ECC508A the 3rd byte will always be 0x50, for the ATECC608A it is 0x60.
+	The fourth byte will indicate the silicon revision.
 */
 
 boolean ATECCX08A::getInfo()
@@ -128,11 +129,10 @@ boolean ATECCX08A::getInfo()
 		return false;
   if (checkCrc() == false) 
 		return false;
-  if (inputBuffer[3] == 0x50) 
+  if (inputBuffer[3] == 0x50 || inputBuffer[3] == 0x60) 
 	{
-		
   	setStatus(STATUS_SUCCESS);
-		return true;   // If we hear a "0x50", that means it had a successful version response.
+		return true;   // If we hear a "0x50" or a 0x60, that means it had a successful version response.
 	}
   else 
 	{
@@ -1582,6 +1582,39 @@ boolean ATECCX08A::signWithSHA256(uint8_t *signature, int sigSize, const uint8_t
       Serial.println();
     }
 		*/
+  }
+  return result;
+}
+
+boolean ATECCX08A::verifyWithSHA256(const uint8_t *signature, int sigSize, const uint8_t *data, int length, int slot, boolean debug)
+{
+  bool result;
+  uint8_t hashValue[SHA256_SIZE];
+	String s;
+	uint8_t publicKey[PUBLIC_KEY_SIZE];
+  
+  Serial.println("verifyWithSHA256 : ");
+  Serial.println("-------------------");
+
+  Serial.println("Signature : ");
+  Serial.println(StringUtils::hexValueToString(signature, sigSize, "", " "));
+	Serial.println("Signaturlänge : " + String(sigSize));
+	Serial.println("Data          : " + StringUtils::hexValueToString(data, length, "", " "));
+	Serial.println("Data-length   : " + String(length));
+  
+
+  result = sha256((uint8_t *) data, length, hashValue);
+  if (result == true)
+  {
+		result = readSlot(publicKey, PUBLIC_KEY_SIZE, slot);
+		if (result == true)
+		{
+			Serial.println("Public Key : ");
+			Serial.println(StringUtils::hexValueToString(publicKey, PUBLIC_KEY_SIZE, "", " "));
+  		Serial.println("readSlot (verifyWithSHA256) ok");
+			result = verifySignature(hashValue, signature, publicKey);
+			Serial.println("Result verifySignature : " + String(result));
+		}
   }
   return result;
 }

@@ -241,6 +241,7 @@ class ATECCX08A {
 		boolean generatePublicKey(uint8_t *publicKey, int size, uint16_t slot = 0x0000, boolean debug = false);
 		boolean createSignature(uint8_t *signature, int size, const uint8_t *data, uint16_t slot, boolean debug = false); 
     boolean signWithSHA256(uint8_t *signature, int sigSize, const uint8_t *data, int length, int slot, boolean debug = false);
+    boolean verifyWithSHA256(const uint8_t *signature, int sigSize, const uint8_t *data, int length, int slot, boolean debug = false);
 		
 		boolean loadTempKey(const uint8_t *data);  // load 32 bytes of data into tempKey (a temporary memory spot in the IC)
 		boolean signTempKey(uint8_t *signature, int size, uint16_t slot = 0x0000, boolean debug = false); // create signature using contents of TempKey and PRIVATE KEY in slot
