@@ -1595,7 +1595,7 @@ boolean ATECCX08A::verifyWithSHA256(const uint8_t *signature, int sigSize, const
   result = sha256((uint8_t *) data, length, hashValue);
   if (result == true)
   {
-		result = readSlot(publicKey, PUBLIC_KEY_SIZE, slot);
+    result = generatePublicKey(publicKey, sizeof(publicKey), slot);
 		if (result == true)
 		{
 			result = verifySignature(hashValue, signature, publicKey);
