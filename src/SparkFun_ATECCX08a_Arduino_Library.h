@@ -254,6 +254,10 @@ class ATECCX08A {
     boolean readSlot(uint8_t *data, int length, int slot, boolean debug = false);
 		boolean encryptDecryptBlock(const uint8_t *input, int inputSize, uint8_t *output, int outputSize, uint8_t slot, uint8_t keyIndex, uint8_t mode, boolean debug=false);
     int     addressForSlotOffset(int slot, int offset);
+		int     getKeyConfig(int slot);
+
+		boolean containsPrivateKey(int slot);
+
 		
 		boolean readConfigZone(boolean debug = false);
 		byte    *getConfigZone();
@@ -295,7 +299,6 @@ class ATECCX08A {
 
 	  void printHexValue(byte value);
 		void printHexValue(const byte *value, int length, const char *separator);
-	
 };
 
 

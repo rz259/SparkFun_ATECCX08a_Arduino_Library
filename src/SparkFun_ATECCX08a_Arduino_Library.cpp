@@ -981,6 +981,15 @@ int ATECCX08A::addressForSlotOffset(int slot, int offset)
   return (slot << 3) | (block << 8) | (offset);
 }
 
+int ATECCX08A::getKeyConfig(int slot)
+{
+  int keyConfig;
+	int offset;
+
+	offset = 96 + slot * 2;
+  keyConfig = configZone[offset] + configZone[offset+1] * 256;
+	return keyConfig;
+}
 
 /** \brief
 
@@ -1595,11 +1604,28 @@ boolean ATECCX08A::verifyWithSHA256(const uint8_t *signature, int sigSize, const
   result = sha256((uint8_t *) data, length, hashValue);
   if (result == true)
   {
-    result = generatePublicKey(publicKey, sizeof(publicKey), slot);
+		if (containsPrivateKey(slot) == true)
+		{
+      result = generatePublicKey(publicKey, sizeof(publicKey), slot);
+		}
+		else
+		{
+			result = readSlot(publicKey, sizeof(publicKey), slot);
+		}
 		if (result == true)
 		{
 			result = verifySignature(hashValue, signature, publicKey);
 		}
   }
+  return result;
+}
+
+boolean ATECCX08A::containsPrivateKey(int slot)
+{
+  int configValue;
+	boolean result;
+	
+	configValue = getKeyConfig(slot);
+  result = (configValue & 0x001) == 0x001;
   return result;
 }
