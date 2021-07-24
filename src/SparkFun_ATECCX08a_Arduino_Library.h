@@ -281,6 +281,7 @@ class ATECCX08A {
 		TwoWire *_i2cPort;
 		uint8_t _i2caddr;
 		Stream *_debugSerial; //The generic connection to user's chosen serial hardware
+		boolean configZoneRead = false;
 		
 		uint8_t crc[2] = {0, 0};
   	byte configZone[128]; // used to store configuration zone bytes read from device EEPROM
@@ -299,6 +300,8 @@ class ATECCX08A {
 
 	  void printHexValue(byte value);
 		void printHexValue(const byte *value, int length, const char *separator);
+		boolean isConfigZoneRead();
+		void    setConfigZoneRead(boolean value);
 };
 
 

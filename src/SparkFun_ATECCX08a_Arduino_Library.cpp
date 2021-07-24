@@ -36,6 +36,7 @@
 	for the same purpose.
 */
 
+
 boolean ATECCX08A::begin(uint8_t i2caddr, TwoWire &wirePort, Stream &serialPort)
 {
   _i2cPort = &wirePort;        //Grab which port the user wants us to use
@@ -1606,6 +1607,7 @@ boolean ATECCX08A::verifyWithSHA256(const uint8_t *signature, int sigSize, const
   {
 		if (containsPrivateKey(slot) == true)
 		{
+
       result = generatePublicKey(publicKey, sizeof(publicKey), slot);
 		}
 		else
@@ -1625,7 +1627,22 @@ boolean ATECCX08A::containsPrivateKey(int slot)
   int configValue;
 	boolean result;
 	
+	if (isConfigZoneRead() == false)
+	{
+		readConfigZone(false);
+		setConfigZoneRead(true);
+	}
 	configValue = getKeyConfig(slot);
   result = (configValue & 0x001) == 0x001;
   return result;
+}
+
+boolean ATECCX08A::isConfigZoneRead()
+{
+  return configZoneRead;
+}
+
+void  ATECCX08A::setConfigZoneRead(boolean value)
+{
+  configZoneRead = true;
 }
